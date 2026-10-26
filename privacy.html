@@ -9,33 +9,74 @@ body { margin: 0; font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Arial, sa
 main { max-width: 680px; margin: 0 auto; padding: 32px 16px 56px; }
 h1 { font-size: 1.6rem; margin: 0 0 8px; } h2 { font-size: 1.1rem; margin: 28px 0 6px; }
 p, li { color: #2c3633; } a { color: #1E6B5C; }
+.upd { color: #5C6966; font-size: .9rem; }
 section[lang="en"] { direction: ltr; text-align: left; border-top: 1px solid #D9E0DE; margin-top: 36px; padding-top: 8px; }
-@media (prefers-color-scheme: dark) { body { background: #0E1413; color: #E5ECEA; } p, li { color: #C9D3D0; } a { color: #6CC4AE; } section[lang="en"] { border-color: #2A3532; } }
+@media (prefers-color-scheme: dark) { body { background: #0E1413; color: #E5ECEA; } p, li { color: #C9D3D0; } a { color: #6CC4AE; } section[lang="en"] { border-color: #2A3532; } .upd { color: #98A6A2; } }
 </style>
 </head>
 <body>
 <main>
 <h1>מדיניות פרטיות</h1>
-<p>BGU Attendance הוא כלי לא רשמי שסטודנטים משתמשים בו כדי לעקוב אחרי הנוכחות שלהם בקורסים ובהכשרה המעשית. הכלי לא שייך לאוניברסיטת בן-גוריון.</p>
-<h2>מה נשמר</h2>
+<p class="upd">עודכן ב-26.10.2026</p>
+<p>BGU Attendance הוא כלי לא רשמי שסטודנטים משתמשים בו כדי לעקוב אחרי הנוכחות שלהם בקורסים ובהכשרה המעשית. הכלי לא שייך לאוניברסיטת בן-גוריון. נכנסים אליו עם חשבון Google, ובכניסה הראשונה צריך גם קוד קבוצה שמקבלים ממנהל האפליקציה.</p>
+
+<h2>מה נשמר בגיליון של האפליקציה</h2>
 <ul>
-<li>כינוי בדוי שהמשתמש בוחר.</li>
-<li>הקורסים, מספר ההיעדרויות המותרות, ימי ההכשרה וסימוני הנוכחות.</li>
-<li>קוד מזהה שמחושב מכתובת ה-Gmail באמצעות מפתח סודי. אי אפשר לשחזר ממנו את הכתובת.</li>
+<li>כינוי בדוי שאתם בוחרים. אי אפשר לשנות אותו אחר כך.</li>
+<li>הסימונים לפי תאריכים והגדרות הקורסים וההכשרה נשמרים <b>מוצפנים</b>, במפתח נפרד לכל סטודנט.</li>
+<li>סיכום שאינו מוצפן, כדי שמנהל האפליקציה יראה תמונה כללית: לכל קורס — הסמסטר, שם הקורס, מספר ההיעדרויות המותרות, כמה נעדרתם, כמה נותרו, כמה נכחתם וכמה שיעורים יש בסך הכול; להכשרה — כמה ימים הייתם, כמה לא הייתם, כמה ימים יש בסך הכול ואיזה אחוז נותר.</li>
+<li>תאריך העדכון האחרון (בלי שעה), גם בשורה שלכם וגם בסיכום.</li>
+<li>קוד מזהה שמחושב ממזהה החשבון הפנימי של Google (לא מכתובת המייל) בעזרת מפתח סודי. מהקוד אי אפשר לשחזר את החשבון או את המייל.</li>
 </ul>
+<p>Google Sheets שומר היסטוריית גרסאות של הגיליון. לכן מנהל האפליקציה יכול לראות גם גרסאות קודמות של הסיכום, וממנן אפשר להבין בערך מתי השתנה מספר ההיעדרויות. הסימונים לפי תאריכים נשארים מוצפנים גם בגרסאות הקודמות.</p>
+
 <h2>מה לא נשמר</h2>
 <ul>
-<li>כתובת ה-Gmail ושם החשבון ב-Google לא נשמרים.</li>
-<li>השם האמיתי שהמשתמש מזין נשאר רק בדפדפן שלו ולא נשלח לשרת.</li>
+<li>כתובת המייל והשם שלכם בחשבון Google לא נשמרים בשרת ולא בגיליון.</li>
+<li>השם האמיתי שאתם רושמים נשאר רק בדפדפן שלכם ולא נשלח לשרת.</li>
 </ul>
-<h2>איפה זה נשמר ומי רואה</h2>
-<p>הנתונים נשמרים בגיליון Google של מי שהקים את הכלי, והוא יכול לראות אותם תחת הכינויים. הנתונים לא נמכרים ולא מועברים לאף אחד אחר.</p>
-<h2>מחיקה</h2>
-<p>אפשר לבקש למחוק את הנתונים בפנייה ל-igor90begun@gmail.com עם הכינוי שלכם.</p>
+
+<h2>מה נשמר בדפדפן שלכם</h2>
+<ul>
+<li>אסימון כניסה, שתקף 180 יום או עד שתצאו.</li>
+<li>עותק של הנתונים שלכם, כדי שהדף יעבוד גם בלי חיבור.</li>
+<li>השם שרשמתם. ביציאה מהחשבון כל אלה נמחקים מהדפדפן. אם יוצאים בלי חיבור לאינטרנט, הכניסה מתבטלת בשרת רק בפעם הבאה שהדף נפתח עם חיבור, ועד אז האסימון נשאר בדפדפן.</li>
+<li>בכניסה הראשונה, עד שבוחרים כינוי, הלשונית שומרת זמנית (עד שסוגרים אותה) את השם מחשבון Google ואת החלק הראשון של כתובת המייל, רק כדי לבדוק שהכינוי לא דומה להם. זה לא נשלח לשום מקום.</li>
+</ul>
+<p>בשרת אסימוני הכניסה נשמרים רק בצורה מגובבת (hash), ולכל חשבון יש לכל היותר 5 כניסות פעילות. המפתח הסודי ומפתחות ההצפנה נשמרים באחסון הפרטי של מנהל האפליקציה בשרת, ולא בגיליון.</p>
+
+<h2>מי רואה מה</h2>
+<p>הגיליון שייך למנהל האפליקציה (<a href="mailto:igor90begun@gmail.com">igor90begun@gmail.com</a>), ורק הוא רואה אותו. בגיליון הוא רואה את הכינויים ואת הסיכום שלמעלה. את הסימונים לפי תאריכים הוא לא רואה בגיליון, כי הם מוצפנים. הנתונים לא נמכרים ולא מועברים לאף אחד אחר.</p>
+<p>חשוב לדעת: מנהל האפליקציה שולט בקוד של השרת, כך שבאופן טכני הוא יכול לשנות את הקוד ולראות יותר. ההצפנה מגנה עליכם אם הגיליון עצמו דולף, אבל היא לא מגנה מפני מנהל האפליקציה.</p>
+
+<h2>שירותים חיצוניים</h2>
+<p>כפתור הכניסה של Google נטען בכל פתיחה של הדף, עוד לפני הכניסה. Google בודקת את הכניסה ומעבירה לשרת של האפליקציה את פרטי החשבון לצורך הבדיקה בלבד; השרת לא שומר אותם. השרת והגיליון פועלים ב-Google Apps Script וב-Google Sheets. הדף עצמו מתארח ב-GitHub Pages, והגופנים נטענים מ-Google Fonts.</p>
+
+<h2>כמה זמן ומחיקה</h2>
+<p>הנתונים נשמרים עד שתמחקו אותם, או עד שהכלי ייסגר אחרי סוף שנת הלימודים תשפ״ז.</p>
+<p>כדי למחוק הכול: בדף, בחלק "החשבון והפרטיות", לוחצים על "מחיקת כל הנתונים שלי". זה מוחק את השורה שלכם, את הסיכום, את מפתח ההצפנה שלכם ואת כל הכניסות הפעילות. אחרי המחיקה גם העותקים המוצפנים בגרסאות קודמות של הגיליון כבר לא ניתנים לפענוח. שורות הסיכום הישנות נשארות בהיסטוריית הגרסאות, עד שמנהל האפליקציה מוחק אותה. אפשר גם לכתוב ל-<a href="mailto:igor90begun@gmail.com">igor90begun@gmail.com</a>.</p>
+
 <section lang="en">
 <h1>Privacy policy</h1>
-<p>BGU Attendance is an unofficial tool students use to track their own course and practicum attendance. It is not affiliated with Ben-Gurion University.</p>
-<p>Stored: a nickname the user chooses, their courses, allowed absences, practicum days and attendance marks, and an identifier derived from the Gmail address with a secret key (the address cannot be recovered from it). Not stored: the Gmail address, the Google account name, or the real name the user enters (it stays in their browser). Data is kept in a Google Sheet owned by the person who set up the tool, who can see it under nicknames. It is not sold or shared. To delete your data, write to igor90begun@gmail.com with your nickname.</p>
+<p class="upd">Updated 26 October 2026</p>
+<p>BGU Attendance is an unofficial tool students use to track their own course and practicum attendance. It is not affiliated with Ben-Gurion University. You sign in with a Google account; the first sign-in also needs a group code from the administrator.</p>
+<p><b>Stored in the app's sheet:</b>
+a nickname you choose, which cannot be changed later;
+your dated marks and course and practicum settings, stored <b>encrypted</b> with a separate key per student;
+an unencrypted summary so the administrator sees the overall picture: per course the semester, course name, allowed absences, absences, absences left, attendance and total lessons, and for the practicum the days attended, days missed, total days and percentage left;
+the date of your last update (no time), in your row and in the summary;
+and an identifier derived from your Google account's internal ID (not your e-mail) with a secret key, which cannot be turned back into your account or address.
+Google Sheets keeps a version history, so the administrator can also see earlier versions of the summary and roughly when absence counts changed; dated marks stay encrypted in old versions too.</p>
+<p><b>Not stored:</b> your e-mail address and Google account name are not stored on the server or in the sheet; the real name you type stays in your browser.</p>
+<p><b>In your browser:</b> a sign-in token valid for 180 days, a copy of your data for offline use, and the name you typed. All of these are removed when you sign out. If you sign out while offline, the sign-in is revoked on the server only the next time the page opens online, and the token stays in the browser until then. During the first sign-in, until you choose a nickname, the tab also keeps your Google name and the part of your e-mail before the @ (until the tab is closed), only to check that the nickname does not resemble them; this is never sent anywhere. On the server, sign-in tokens are kept only as hashes, with at most 5 active sign-ins per account; the secret key and the encryption keys are kept in the administrator's private server storage, not in the sheet.</p>
+<p><b>Who sees what:</b> the sheet belongs to the app's administrator (<a href="mailto:igor90begun@gmail.com">igor90begun@gmail.com</a>), and only he can see it. He sees nicknames and the summary above, not your dated marks. The data is not sold or shared. Note that he controls the server code, so technically he could change the code to see more. The encryption protects you if the sheet itself leaks, not from the administrator.</p>
+<p><b>Third parties:</b>
+the Google sign-in button loads every time the page opens, even before you sign in;
+Google checks the sign-in and passes the account details to the app's server for that check only, and the server does not keep them;
+the server and sheet run on Google Apps Script and Google Sheets;
+the page is hosted on GitHub Pages;
+fonts load from Google Fonts.</p>
+<p><b>Retention and deletion:</b> data is kept until you delete it, or until the tool is shut down after the end of the 2026–27 academic year. Use "מחיקת כל הנתונים שלי" in the "החשבון והפרטיות" section to delete your row, summary, encryption key and all active sign-ins; after that, encrypted copies in older versions of the sheet can no longer be decrypted, while old summary rows remain in the version history until the administrator deletes it. You can also write to <a href="mailto:igor90begun@gmail.com">igor90begun@gmail.com</a>.</p>
 </section>
 </main>
 </body>
