@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>נוכחות והכשרה מעשית · בן-גוריון תשפ״ז</title>
+<meta name="theme-color" content="#1E6B5C">
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<script src="config.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one RTL column — semester switch on top; then either the course setup form, or today's question, a card per course, the Monday ledger and course editing. */
+:root {
+  --bg: #F2F4F3;
+  --surface: #FFFFFF;
+  --fg: #17211F;
+  --muted: #5C6966;
+  --line: #D9E0DE;
+  --accent: #1E6B5C;
+  --accent-soft: #E1F0EC;
+  --present: #1E7A4E;
+  --present-soft: #DDF1E6;
+  --absent: #C0391B;
+  --absent-soft: #FBE4DC;
+  --cancel: #6B6F8C;
+  --cancel-soft: #E8E9F2;
+  --break: #B9461A;
+  --warn: #94650A;
+  --warn-soft: #FAF0D7;
+  --font-display: "Rubik", "IBM Plex Sans Hebrew", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans Hebrew", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1413; --surface: #161E1C; --fg: #E5ECEA; --muted: #98A6A2; --line: #2A3532;
+    --accent: #6CC4AE; --accent-soft: #17302A;
+    --present: #5FCB92; --present-soft: #163024; --absent: #F07A5C; --absent-soft: #3A1E17;
+    --cancel: #A3A8CC; --cancel-soft: #24263A; --break: #F08B62; --warn: #E2B44A; --warn-soft: #322810;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1413; --surface: #161E1C; --fg: #E5ECEA; --muted: #98A6A2; --line: #2A3532;
+  --accent: #6CC4AE; --accent-soft: #17302A;
+  --present: #5FCB92; --present-soft: #163024; --absent: #F07A5C; --absent-soft: #3A1E17;
+  --cancel: #A3A8CC; --cancel-soft: #24263A; --break: #F08B62; --warn: #E2B44A; --warn-soft: #322810;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; direction: rtl; }
+.wrap {
+  max-width: 760px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+  display: grid; gap: 22px;
+}
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: 1.7rem; font-weight: 700; line-height: 1.2; }
+h2 { font-size: 1.12rem; font-weight: 500; }
+.lede { color: var(--muted); margin: 6px 0 0; max-width: 62ch; }
+.label { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.note { font-size: 0.9rem; color: var(--muted); margin: 0; }
+.status-line { font-size: 0.85rem; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.ok { background: var(--present); }
+.dot.local { background: var(--warn); }
+.backup { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.section { display: grid; gap: 12px; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* semester switch */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.tabs button {
+  font: inherit; padding: 10px 12px; border-radius: 10px; border: 0; background: transparent; color: var(--fg);
+  cursor: pointer; display: grid; gap: 0; text-align: center;
+}
+.tabs button b { font-family: var(--font-display); font-weight: 500; font-size: 1rem; }
+.tabs button small { color: var(--muted); font-family: var(--font-num); font-size: 0.75rem; direction: ltr; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--surface); }
+.tabs button[aria-selected="true"] small { color: var(--surface); opacity: .85; }
+
+/* top switch */
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 14px; background: var(--fg); }
+.views button { font: 600 0.98rem var(--font-display); padding: 11px 12px; border-radius: 10px; border: 0; background: transparent; color: var(--bg); cursor: pointer; }
+.views button[aria-selected="true"] { background: var(--bg); color: var(--fg); }
+.views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* practicum */
+.prac-big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.prac-big .n { font-family: var(--font-display); font-weight: 700; font-size: clamp(3rem, 16vw, 5rem); line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; direction: ltr; }
+.prac-big .u { color: var(--muted); }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 0.92rem; }
+.meta b { color: var(--fg); font-weight: 600; }
+.pstrip { display: grid; grid-template-columns: repeat(auto-fill, minmax(14px, 1fr)); gap: 4px; }
+.pstrip .sq.done { background: var(--accent); border-color: var(--accent); }
+.pstrip .sq.missed { background: var(--absent); border-color: var(--absent); }
+.month { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.month > summary { cursor: pointer; padding: 10px 12px; list-style: none; display: flex; justify-content: space-between; gap: 10px; font-weight: 600; }
+.month > summary::-webkit-details-marker { display: none; }
+.month ul { list-style: none; margin: 0; padding: 0 10px 10px; display: grid; gap: 4px; }
+.prow { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 8px; border-radius: 9px; background: var(--bg); }
+.prow.today { outline: 2px solid var(--accent); }
+.prow .d { display: inline-flex; gap: 6px; align-items: baseline; }
+.tag { font-size: 0.75rem; font-weight: 600; color: var(--warn); border: 1px solid currentColor; border-radius: 999px; padding: 0 7px; }
+.seg button[aria-pressed="true"][data-s="done"], .seg button[aria-pressed="true"][data-s="done"]:hover { background: var(--accent); color: var(--surface); }
+.seg button[aria-pressed="true"][data-s="missed"], .seg button[aria-pressed="true"][data-s="missed"]:hover { background: var(--absent); color: var(--surface); }
+.pform { display: grid; gap: 12px; }
+.pform .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.pform label.f { display: grid; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+.wds { display: flex; gap: 6px; flex-wrap: wrap; }
+.wds label { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 9px; border: 1.5px solid var(--line); background: var(--surface); cursor: pointer; }
+.wds input { accent-color: var(--accent); }
+.calc { font-size: 0.95rem; }
+.calc b { font-family: var(--font-display); font-size: 1.2rem; }
+input.field[type="date"] { width: auto; }
+
+/* buttons */
+.btn {
+  font: 600 0.92rem var(--font-body); padding: 10px 14px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--line); background: var(--surface); color: var(--fg);
+  transition: background .12s, border-color .12s, color .12s;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { cursor: default; opacity: .55; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btn.on-all { background: var(--present); border-color: var(--present); color: var(--surface); }
+.btn.on-some { background: var(--absent); border-color: var(--absent); color: var(--surface); }
+.btn.on-none { background: var(--cancel); border-color: var(--cancel); color: var(--surface); }
+.btn.small { padding: 6px 10px; font-size: 0.84rem; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--accent); padding-inline: 6px; }
+.btn.danger { color: var(--absent); }
+.btn:focus-visible, .seg button:focus-visible, .tabs button:focus-visible, summary:focus-visible,
+.day-head:focus-visible, input:focus-visible, label.btn:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.answers { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* segmented mark control */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--surface); flex: none; }
+.seg button {
+  font: 600 0.84rem var(--font-body); color: var(--fg); background: transparent;
+  border: 0; padding: 7px 11px; cursor: pointer; border-inline-start: 1px solid var(--line);
+}
+.seg button:first-child { border-inline-start: 0; }
+.seg button:hover:not(:disabled) { background: var(--accent-soft); }
+.seg button:disabled { cursor: default; opacity: .55; }
+.seg button[aria-pressed="true"][data-s="present"], .seg button[aria-pressed="true"][data-s="present"]:hover { background: var(--present); color: var(--surface); }
+.seg button[aria-pressed="true"][data-s="absent"], .seg button[aria-pressed="true"][data-s="absent"]:hover { background: var(--absent); color: var(--surface); }
+.seg button[aria-pressed="true"][data-s="cancelled"], .seg button[aria-pressed="true"][data-s="cancelled"]:hover { background: var(--cancel); color: var(--surface); }
+
+/* cards and rows */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.card p { margin: 0; }
+.today-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.today-date { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; }
+.editor { display: grid; gap: 12px; }
+.q { font-weight: 600; }
+.courses { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.course-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: 10px; background: var(--bg);
+}
+.course-row.absent { background: var(--absent-soft); }
+.course-row.cancelled { background: var(--cancel-soft); }
+.cn { display: grid; min-width: 0; }
+.cn b { font-weight: 600; }
+.cn small { color: var(--muted); font-size: 0.8rem; }
+.cn small .tm { font-family: var(--font-num); direction: ltr; unicode-bidi: isolate; }
+
+/* setup */
+.setup h2 { font-size: 1.25rem; }
+.srows { display: grid; gap: 6px; }
+.srow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px; border-radius: 10px; background: var(--bg); }
+.srow.off { opacity: .6; }
+.chk { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px; cursor: pointer; }
+.chk input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; margin: 0; }
+.cinputs { display: grid; gap: 6px; flex: 1; min-width: 200px; }
+.allow { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+.opts { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+select.field.sel { width: auto; padding-inline: 8px; }
+.row-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+input.field, select.field {
+  font: 400 0.95rem var(--font-body); padding: 9px 10px; border-radius: 9px; border: 1.5px solid var(--line);
+  background: var(--surface); color: var(--fg); min-width: 0; width: 100%;
+}
+input.field.n { width: 76px; text-align: center; font-family: var(--font-num); }
+input.field.bad { border-color: var(--absent); background: var(--absent-soft); }
+.err { color: var(--absent); font-weight: 600; margin: 0; }
+.setup-actions { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* course tallies */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.cc-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.cc-head .cn b { font-size: 1rem; line-height: 1.35; }
+.pill { font-size: 0.78rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; flex: none; }
+.pill.ok { background: var(--present-soft); color: var(--present); }
+.pill.edge { background: var(--warn-soft); color: var(--warn); }
+.pill.over { background: var(--absent-soft); color: var(--absent); }
+.pill.idle { background: var(--accent-soft); color: var(--accent); }
+.meter { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.meter .n { font-family: var(--font-display); font-weight: 700; font-size: 2.3rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.meter .u { color: var(--muted); font-size: 0.95rem; }
+.meter.over .n { color: var(--absent); }
+.meter.edge .n { color: var(--warn); }
+.strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(18px, 1fr)); gap: 4px; }
+.sq { aspect-ratio: 1; max-width: 100%; border-radius: 4px; border: 1.5px solid var(--line); background: var(--bg); display: block; }
+.sq.present { background: var(--present); border-color: var(--present); }
+.sq.absent { background: var(--absent); border-color: var(--absent); }
+.sq.cancelled { background: var(--cancel-soft); border-color: var(--cancel); border-style: dashed; }
+.sq.unmarked { border-color: var(--warn); border-width: 2px; }
+.sq.today { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.facts { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 0.92rem; }
+.facts li { display: flex; justify-content: space-between; gap: 12px; border-top: 1px dashed var(--line); padding-top: 4px; }
+.facts li:first-child { border-top: 0; padding-top: 0; }
+.facts b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.84rem; color: var(--muted); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.legend .sq { width: 14px; }
+
+/* ledger */
+.days { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.day { border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.day.today { border-color: var(--accent); }
+.day.brk { background: transparent; border-style: dashed; }
+.day-head {
+  width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 10px 12px; background: transparent; border: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; border-radius: 12px;
+}
+.day.brk .day-head { cursor: default; }
+.day-head .d { flex: none; display: inline-flex; gap: 6px; align-items: baseline; }
+.day-head .d .num { direction: ltr; }
+.day-head .d small { color: var(--muted); }
+.day-head .sum { min-width: 0; flex: 1; text-align: end; font-size: 0.9rem; color: var(--muted); }
+.sum.all { color: var(--present); font-weight: 600; }
+.sum.some { color: var(--absent); font-weight: 600; }
+.sum.none { color: var(--cancel); font-weight: 600; }
+.sum.warn { color: var(--warn); font-weight: 600; }
+.sum.brk { color: var(--break); }
+.day-body { padding: 0 12px 12px; display: grid; gap: 8px; }
+.chev { color: var(--muted); flex: none; transition: transform .15s; }
+.day.open .chev { transform: rotate(180deg); }
+
+/* course editing */
+details.manage { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+details.manage summary { cursor: pointer; padding: 14px 18px; font-family: var(--font-display); font-weight: 500; list-style: none; display: flex; justify-content: space-between; gap: 10px; }
+details.manage summary::-webkit-details-marker { display: none; }
+.manage-body { padding: 0 18px 18px; display: grid; gap: 14px; }
+.mlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.mrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg); border-radius: 10px; flex-wrap: wrap; }
+.mrow .cn { flex: 1; min-width: 180px; }
+form.add { display: grid; gap: 8px; grid-template-columns: 2fr 1fr 1fr; align-items: end; }
+form.add label { display: grid; gap: 4px; font-size: 0.84rem; color: var(--muted); }
+form.add .full { grid-column: 1 / -1; }
+
+/* warnings: yellow = one absence left, red = none left or over */
+.card.lvl-y { background: var(--warn-soft); border-color: var(--warn); }
+.card.lvl-r { background: var(--absent-soft); border-color: var(--absent); }
+.card.lvl-y .facts li, .card.lvl-r .facts li { border-top-color: color-mix(in srgb, currentColor 18%, transparent); }
+.pill.y { background: var(--warn); color: var(--surface); }
+.pill.r { background: var(--absent); color: var(--surface); }
+.meter.y .n { color: var(--warn); }
+.meter.r .n { color: var(--absent); }
+.rem { font-size: 0.78rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.rem.y { color: var(--warn); }
+.rem.r { color: var(--absent); }
+.alerts { display: grid; gap: 8px; }
+.alert { border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; border: 1.5px solid; }
+.alert.r { background: var(--absent-soft); border-color: var(--absent); }
+.alert.y { background: var(--warn-soft); border-color: var(--warn); }
+.alert b { font-family: var(--font-display); font-weight: 500; }
+.alert.r b { color: var(--absent); }
+.alert.y b { color: var(--warn); }
+.alert ul { margin: 0; padding-inline-start: 18px; }
+.toast.y { background: var(--warn-soft); color: var(--fg); border: 1.5px solid var(--warn); }
+.toast.r { background: var(--absent-soft); color: var(--fg); border: 1.5px solid var(--absent); }
+.login { justify-items: start; }
+.login .gbtn { min-height: 44px; }
+.who { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* percentage bars */
+.barrow { display: grid; gap: 5px; }
+.barrow .lbl { display: flex; justify-content: space-between; gap: 10px; font-size: 0.88rem; color: var(--muted); }
+.barrow .lbl b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar { height: 10px; border-radius: 999px; background: var(--line); position: relative; overflow: hidden; }
+.bar.marked { overflow: visible; }
+.bar > i { display: block; height: 100%; border-radius: 999px; background: var(--present); }
+.bar.stack { display: flex; }
+.bar.stack > i { border-radius: 0; }
+.bar > i.acc, .sw.acc { background: var(--accent); }
+.bar > i.ok, .sw.ok { background: var(--present); }
+.bar > i.y, .sw.y { background: var(--warn); }
+.bar > i.r, .sw.r { background: var(--absent); }
+.bar > i.c, .sw.c { background: var(--cancel); }
+.bar > i.u, .sw.u { background: transparent; box-shadow: inset 0 0 0 2px var(--warn); }
+.bar .mark { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-inline-start: -1px; border-radius: 2px; background: var(--fg); }
+.dlegend { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.88rem; }
+.dlegend li { display: flex; align-items: center; gap: 8px; }
+.dlegend li b { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.sw { width: 12px; height: 12px; border-radius: 3px; flex: none; display: inline-block; }
+.empty { border: 1.5px dashed var(--line); border-radius: 14px; padding: 18px; color: var(--muted); display: grid; gap: 6px; }
+.empty b { color: var(--fg); }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 0.92rem;
+  max-width: calc(100% - 32px); z-index: 20;
+}
+footer { font-size: 0.85rem; color: var(--muted); display: grid; gap: 6px; }
+footer a { color: var(--accent); }
+@media (max-width: 520px) {
+  h1 { font-size: 1.45rem; }
+  form.add { grid-template-columns: 1fr 1fr; }
+  form.add .wide { grid-column: 1 / -1; }
+  .course-row .seg { width: 100%; }
+  .course-row .seg button { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>נוכחות והכשרה מעשית · בן-גוריון תשפ״ז</h1>
+    <p class="lede">בהתחלה רושמים אילו קורסים יש לכם וכמה היעדרויות מותרות בכל אחד. אחרי כל יום לימודים מסמנים אם הייתם בכל השיעורים, והדף סופר כמה היעדרויות נשארו. בלשונית „הכשרה מעשית" מסמנים כל יום הכשרה ורואים כמה אחוזים נשארו.</p>
+  </header>
+
+  <div class="status-line" id="status" role="status"><span class="dot"></span><span>טוען…</span></div>
+  <div class="backup" id="backup" hidden></div>
+  <input type="file" id="imp-file" accept=".json,application/json" hidden>
+
+  <div id="main" class="section"></div>
+
+  <footer>
+    <span>תאריכים: <a href="https://www.bgu.ac.il/academic-calendar/" target="_blank" rel="noopener">לוח השנה האקדמי של בן-גוריון</a>, נכון ל-26.10.2026. ימי פגרה וחגים כבר הוצאו מהחישוב.</span>
+    <span>את מספר ההיעדרויות המותרות בודקים בסילבוס של כל קורס או אצל המרצה.</span>
+  </footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ===================== config ===================== */
+/* Set in config.js on the hosted version: window.BGU_CONFIG = { apiUrl, clientId }. Empty → device-only mode. */
+const CFG = window.BGU_CONFIG || {};
+
+/* ===================== calendar: BGU 2026-27 ===================== */
+const WEEKDAY = 1; // default class day (Monday); each course can have its own day
+const HE_WD = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+const SEMS = [
+  { id:'A', name:'סמסטר א׳', range:'18.10.26–15.01.27', start:'2026-10-18', end:'2027-01-15', startText:'18.10.2026' },
+  { id:'B', name:'סמסטר ב׳', range:'28.02.27–25.06.27', start:'2027-02-28', end:'2027-06-25', startText:'28.02.2027' }
+];
+const BREAKS = [
+  ['2026-10-27','2026-10-27','בחירות לכנסת'], ['2026-12-06','2026-12-06','חנוכה'],
+  ['2027-03-14','2027-03-14','מסיבת פורים'], ['2027-03-22','2027-03-23','פורים'],
+  ['2027-04-18','2027-04-28','פסח'], ['2027-05-11','2027-05-11','יום הזיכרון'],
+  ['2027-05-12','2027-05-12','יום העצמאות'], ['2027-06-10','2027-06-11','שבועות']
+];
+const NOTES = {
+  '2026-11-09':'חג הסיגד – יום לימודים לפי הלוח',
+  '2026-11-16':'יום הזיכרון לבן-גוריון – יום לימודים',
+  '2027-05-10':'ערב יום הזיכרון: הפסקה של שעה, ואין לימודים מ-18:00',
+  '2027-05-24':'חג הנביא שועייב – יום לימודים'
+};
+const DEFAULTS = { A: [
+  { id: 'men',  name: 'טיפול בגברים - מתיאוריה לפרקטיקה', time: '08:00–10:00' },
+  { id: 'prac', name: "פרקטיקום אינטגרטיבי בבריאות נפש - א'", time: '10:00–12:00' },
+  { id: 'lab',  name: "מעבדה לתלמידי השלמה לתואר שני - שנה שנייה סמסטר א'", time: '12:00–14:00' },
+  { id: 'sci',  name: 'חשיבה מדעית', time: '14:00–16:00' },
+  { id: 'psy',  name: 'סוגיות עיקריות בטיפול פסיכו-סוציאלי', time: '16:00–18:00' }
+], B: [] };
+/* practicum (הכשרה מעשית): state holidays on which placements are closed, and the winter break (once a week) */
+const PRAC_HOLIDAYS = { '2027-04-22':'פסח', '2027-04-28':'שביעי של פסח', '2027-05-12':'יום העצמאות', '2027-06-11':'שבועות' };
+const WINTER = ['2027-01-17', '2027-02-27'];
+const PRAC_DEFAULT = { days: [0, 3], start: '2026-10-28', end: '2027-06-30', winterOnce: true };
+const HE_MONTH = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const ST = { present: 'נכחתי', absent: 'נעדרתי', cancelled: 'בוטל' };
+
+/* ===================== helpers ===================== */
+const DAY = 86400000;
+const ts = s => { const [y,m,d] = s.split('-').map(Number); return Date.UTC(y, m-1, d); };
+const iso = t => new Date(t).toISOString().slice(0,10);
+const pad = n => String(n).padStart(2,'0');
+const dm = t => { const d = new Date(t); return pad(d.getUTCDate()) + '.' + pad(d.getUTCMonth()+1); };
+const now = new Date();
+const TODAY = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = x => x == null ? '—' : (Math.round(x * 1000) / 10) + '%';
+const fix2 = x => (Math.round(x * 100) / 100).toFixed(2);
+const breakOf = t => { for (const [f, to, n] of BREAKS) if (t >= ts(f) && t <= ts(to)) return n; return null; };
+const SEM_DAYS = SEMS.map(s => {
+  const all = [];
+  for (let t = ts(s.start); t <= ts(s.end); t += DAY) {
+    const wd = new Date(t).getUTCDay(); if (wd === 6) continue;
+    all.push({ t, key: iso(t), wd, brk: breakOf(t), sem: s.id });
+  }
+  return { ...s, all };
+});
+const semById = id => SEM_DAYS.find(s => s.id === id);
+const semOf = key => SEM_DAYS.find(s => key >= s.start && key <= s.end);
+const wdOf = c => Number.isInteger(c.wd) ? c.wd : WEEKDAY;
+const dayName = t => `יום ${HE_WD[new Date(t).getUTCDay()]}`;
+const lessonsOnWd = (sid, wd) => semById(sid).all.filter(d => d.wd === wd && !d.brk).length;
+const newId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
+const lsDel = k => { try { localStorage.removeItem(k); } catch (e) {} };
+
+/* ===================== state ===================== */
+const emptyState = () => ({ marks: {}, courses: { A: null, B: null }, prac: null });
+let me = emptyState();
+let loaded = false;
+let mode = 'loading';            // loading | cloud (claude.ai) | remote (Google Sheet) | local (this browser)
+let storageOk = true;
+const inArtifact = !!(window.claude && typeof window.claude.use === 'function');
+let view = [0, 3].includes(new Date(TODAY).getUTCDay()) ? 'prac' : 'courses';
+let tab = (SEM_DAYS.find(s => TODAY <= ts(s.end)) || SEM_DAYS[1]).id;
+const drafts = {}, setupErr = {};
+const openDays = new Set();
+let confirmDelete = null, manageOpen = false;
+let pracDraft = null, pracErr = '', pracEditing = false, pracOpenMonths = null;
+
+const isSetup = sid => Array.isArray(me.courses[sid]);
+const coursesFor = sid => me.courses[sid] || [];
+const dayMap = key => (me.marks && me.marks[key]) || {};
+const normCourses = v => ({ A: v && Array.isArray(v.A) ? v.A : null, B: v && Array.isArray(v.B) ? v.B : null });
+const normPrac = p => (p && Array.isArray(p.days) && p.start && p.end)
+  ? { days: p.days.filter(n => Number.isInteger(n) && n >= 0 && n <= 6), start: p.start, end: p.end, winterOnce: !!p.winterOnce, total: Number(p.total) > 0 ? Number(p.total) : null, marks: (p.marks && typeof p.marks === 'object') ? p.marks : {} }
+  : null;
+const normState = v => ({ marks: (v && v.marks) || {}, courses: normCourses(v && v.courses), prac: normPrac(v && v.prac) });
+
+/* ===================== counting: courses ===================== */
+function tallyCourse(sem, c) {
+  let present = 0, absent = 0, cancelled = 0, unmarked = 0; const cells = [];
+  for (const d of sem.all.filter(d => d.wd === wdOf(c) && !d.brk)) {
+    const st = dayMap(d.key)[c.id];
+    if (st === 'present') present++; else if (st === 'absent') absent++; else if (st === 'cancelled') cancelled++; else if (d.t <= TODAY) unmarked++;
+    cells.push({ d, st: st || (d.t <= TODAY ? 'unmarked' : '') });
+  }
+  const planned = Number(c.lessons) > 0 ? Number(c.lessons) : cells.length;
+  const total = Math.max(0, planned - cancelled);
+  const allowed = Number.isFinite(c.allowed) ? c.allowed : null;
+  return { cells, total, present, absent, cancelled, unmarked, allowed,
+    left: allowed == null ? null : allowed - absent,
+    best: total ? (total - absent) / total : null, share: total ? 1 / total : null };
+}
+/* yellow: exactly one absence left; red: none left or over the limit */
+const levelOf = r => r.allowed == null ? '' : r.left <= 0 ? 'r' : r.left === 1 ? 'y' : '';
+const levelsFor = sid => coursesFor(sid).map(c => { const r = tallyCourse(semById(sid), c); return { c, r, lvl: levelOf(r) }; });
+function warnText(c, r) {
+  if (r.left < 0) return `${c.name}: חריגה של ${-r.left} מעבר למכסה`;
+  if (r.left === 0) return r.allowed === 0 ? `${c.name}: אסור להיעדר בקורס הזה` : `${c.name}: אין יותר היעדרויות מותרות`;
+  return `${c.name}: נותרה היעדרות אחת`;
+}
+
+const coursesOn = (sid, wd) => coursesFor(sid).filter(c => wdOf(c) === wd);
+const studyDates = sid => { const wds = new Set(coursesFor(sid).map(wdOf)); return semById(sid).all.filter(d => wds.has(d.wd)); };
+function daySummary(key) {
+  const s = semOf(key); const t = ts(key); const list = coursesOn(s.id, new Date(t).getUTCDay()); const map = dayMap(key);
+  if (!list.length) return { cls: '', text: '' };
+  const marked = list.filter(c => map[c.id]);
+  if (!marked.length) return t <= TODAY ? { cls: 'warn', text: 'לא סומן' } : { cls: '', text: '' };
+  const abs = list.filter(c => map[c.id] === 'absent'), can = list.filter(c => map[c.id] === 'cancelled'), pre = list.filter(c => map[c.id] === 'present');
+  if (pre.length === list.length) return { cls: 'all', text: 'נכחתי בכל השיעורים' };
+  if (can.length === list.length) return { cls: 'none', text: 'לא היו שיעורים' };
+  const parts = [];
+  if (abs.length) parts.push('נעדרתי: ' + abs.map(c => c.name).join(', '));
+  if (can.length) parts.push('בוטלו: ' + can.map(c => c.name).join(', '));
+  if (marked.length < list.length) parts.push(`סומנו ${marked.length} מתוך ${list.length}`);
+  return { cls: abs.length ? 'some' : 'all', text: parts.join(' · ') };
+}
+
+/* ===================== counting: practicum ===================== */
+function pracSchedule(p) {
+  const out = []; if (!p || !p.days.length) return out;
+  const first = Math.min(...p.days);
+  for (let t = ts(p.start); t <= ts(p.end); t += DAY) {
+    const wd = new Date(t).getUTCDay(); const key = iso(t);
+    if (!p.days.includes(wd) || PRAC_HOLIDAYS[key]) continue;
+    const winter = key >= WINTER[0] && key <= WINTER[1];
+    if (winter && p.winterOnce && wd !== first) continue;
+    out.push({ t, key, wd, winter });
+  }
+  return out;
+}
+function pracTally(p) {
+  const sched = pracSchedule(p); const total = p.total || sched.length;
+  const inSched = new Set(sched.map(d => d.key));
+  let done = 0, missed = 0, unmarked = 0;
+  for (const k in p.marks) { if (p.marks[k] === 'done') done++; else if (p.marks[k] === 'missed') missed++; }
+  for (const d of sched) if (d.t <= TODAY && !p.marks[d.key]) unmarked++;
+  const extra = Object.keys(p.marks).filter(k => !inSched.has(k)).sort();
+  const per = total ? 100 / total : 0;
+  return { sched, total, done, missed, unmarked, extra, per, remaining: Math.max(0, 100 - done * per) };
+}
+
+/* ===================== pieces ===================== */
+const clampPct = x => Math.max(0, Math.min(100, Number.isFinite(x) ? x : 0));
+const pct1 = x => x == null ? '—' : (Math.round(x * 1000) / 10) + '%';
+function barHTML(lbl, val, fill, cls, mark) {
+  return `<div class="barrow"><div class="lbl"><span>${lbl}</span><b dir="ltr">${val}</b></div><div class="bar${mark != null ? ' marked' : ''}" role="img" aria-label="${esc(lbl)}: ${esc(val)}"><i class="${cls || 'ok'}" style="width:${clampPct(fill)}%"></i>${mark != null ? `<span class="mark" style="inset-inline-start:${clampPct(mark)}%" title="המכסה"></span>` : ''}</div></div>`;
+}
+const courseName = c => `<span class="cn"><b>${esc(c.name)}</b><small>יום ${HE_WD[wdOf(c)]}${c.time ? ` · <span class="tm" dir="ltr">${esc(c.time)}</span>` : ''}</small></span>`;
+const ready = () => loaded && (mode === 'cloud' || mode === 'local' || (mode === 'remote' && !needLogin && !needProfile()));
+
+function segHTML(key, cid, cur, where) {
+  const dis = ready() ? '' : ' disabled';
+  return `<div class="seg" role="group" aria-label="סימון">` + ['present','absent','cancelled'].map(s =>
+    `<button type="button" id="seg-${where}-${key}-${esc(cid)}-${s}" data-act="course" data-k="${key}" data-c="${esc(cid)}" data-s="${s}" aria-pressed="${cur === s}"${dis}>${ST[s]}</button>`).join('') + '</div>';
+}
+
+function remBadge(sid, c) {
+  const r = tallyCourse(semById(sid), c); if (r.allowed == null) return '';
+  const lvl = levelOf(r);
+  const txt = r.left < 0 ? `חריגה של ${-r.left}` : r.left === 0 ? 'לא נותרו היעדרויות' : r.left === 1 ? 'נותרה 1' : `נותרו ${r.left}`;
+  return `<span class="rem ${lvl}">${txt}</span>`;
+}
+
+function editorHTML(key, where) {
+  const s = semOf(key); const list = coursesOn(s.id, new Date(ts(key)).getUTCDay());
+  if (!list.length) return `<p class="note">אין קורסים ביום הזה.</p>`;
+  const map = dayMap(key); const vals = list.map(c => map[c.id]);
+  const allP = vals.every(v => v === 'present'), allC = vals.every(v => v === 'cancelled'), any = vals.some(Boolean);
+  const showList = (any && !allP && !allC) || openDays.has(key + ':list');
+  const dis = ready() ? '' : ' disabled';
+  let html = `<div class="editor"><span class="q">הייתם בכל השיעורים?</span><div class="answers">
+    <button type="button" class="btn${allP && !showList ? ' on-all' : ''}" id="ans-${where}-${key}-all" data-act="all" data-k="${key}"${dis}>כן, בכולם</button>
+    <button type="button" class="btn${showList ? ' on-some' : ''}" id="ans-${where}-${key}-some" data-act="some" data-k="${key}"${dis}>לא, נעדרתי</button>
+    <button type="button" class="btn${allC && !showList ? ' on-none' : ''}" id="ans-${where}-${key}-none" data-act="none" data-k="${key}"${dis}>לא היו שיעורים</button>
+  </div>`;
+  if (showList) {
+    html += `<span class="note">סמנו מאילו קורסים נעדרתם:</span><ul class="courses">` + list.map(c =>
+      `<li class="course-row ${map[c.id] || ''}"><span class="cn"><b>${esc(c.name)}</b>${c.time ? `<small><span class="tm" dir="ltr">${esc(c.time)}</span></small>` : ''}${remBadge(s.id, c)}</span>${segHTML(key, c.id, map[c.id], where)}</li>`).join('') + '</ul>';
+  }
+  return html + '</div>';
+}
+
+/* ===================== courses: setup ===================== */
+function draftFor(sid) {
+  if (!drafts[sid]) drafts[sid] = (DEFAULTS[sid] || []).map(c => ({ ...c, wd: WEEKDAY, lessons: '', on: true, allowed: '', custom: false }));
+  return drafts[sid];
+}
+const wdSelect = (id, attrs, cur, dis) => `<select class="field sel" id="${id}" ${attrs}${dis}>${[0,1,2,3,4,5].map(i => `<option value="${i}"${i === cur ? ' selected' : ''}>יום ${HE_WD[i]}</option>`).join('')}</select>`;
+function setupHTML(sid) {
+  const sem = semById(sid); const rows = draftFor(sid);
+  const canCopy = sid === 'B' && isSetup('A') && coursesFor('A').length;
+  const dis = ready() ? '' : ' disabled';
+  return `<form class="card setup" id="setup-form" data-sem="${sid}" novalidate>
+    <h2>הגדרת הקורסים · ${sem.name}</h2>
+    <p class="note">סמנו אילו קורסים יש לכם, באיזה יום בשבוע כל קורס מתקיים, וכמה היעדרויות מותרות בו. מספר השיעורים מחושב לפי לוח השנה, ואם בסילבוס כתוב מספר אחר, רשמו אותו. את המספרים בודקים בסילבוס או אצל המרצה.</p>
+    ${sid === 'B' ? `<p class="note">אם עוד לא נרשמתם לקורסים של סמסטר ב׳, חזרו לכאן אחרי ההרשמה.</p>` : ''}
+    ${canCopy ? `<div><button type="button" class="btn small" id="copy-a" data-act="copy-a"${dis}>העתקת הקורסים מסמסטר א׳</button></div>` : ''}
+    <div class="srows">${rows.length ? rows.map((r, i) => `
+      <div class="srow${r.on ? '' : ' off'}">
+        ${r.custom
+          ? `<label class="chk" style="flex:none;min-width:0"><input type="checkbox" id="s-${sid}-${i}-on" data-sf="on" data-i="${i}"${r.on ? ' checked' : ''}${dis} aria-label="כולל את הקורס"></label>
+             <div class="cinputs"><input class="field${r.badName ? ' bad' : ''}" id="s-${sid}-${i}-name" data-sf="name" data-i="${i}" value="${esc(r.name)}" placeholder="שם הקורס" aria-label="שם הקורס"${dis}>
+             <input class="field" id="s-${sid}-${i}-time" data-sf="time" data-i="${i}" value="${esc(r.time)}" placeholder="שעות, למשל 10:00–12:00" aria-label="שעות" dir="auto"${dis}></div>`
+          : `<label class="chk"><input type="checkbox" id="s-${sid}-${i}-on" data-sf="on" data-i="${i}"${r.on ? ' checked' : ''}${dis}>${courseName(r)}</label>`}
+        <div class="opts">
+        <label class="allow">יום${wdSelect(`s-${sid}-${i}-wd`, `data-sf="wd" data-i="${i}"`, Number(r.wd), r.on ? dis : ' disabled')}</label>
+        <label class="allow">שיעורים
+          <input class="field n${r.badL ? ' bad' : ''}" type="number" inputmode="numeric" min="1" max="40" step="1" id="s-${sid}-${i}-lessons" data-sf="lessons" data-i="${i}" value="${esc(r.lessons)}" placeholder="${lessonsOnWd(sid, Number(r.wd))}"${r.on ? '' : ' disabled'}${dis}>
+        </label>
+        <label class="allow">היעדרויות מותרות
+          <input class="field n${r.bad ? ' bad' : ''}" type="number" inputmode="numeric" min="0" max="20" step="1" id="s-${sid}-${i}-allowed" data-sf="allowed" data-i="${i}" value="${esc(r.allowed)}"${r.on ? '' : ' disabled'}${dis}>
+        </label>
+        </div>
+        ${r.custom ? `<button type="button" class="btn small ghost danger" id="s-${sid}-${i}-rm" data-act="setup-rm" data-i="${i}">הסרה</button>` : ''}
+      </div>`).join('') : `<p class="note">עוד אין קורסים ברשימה. הוסיפו את הקורסים שלכם.</p>`}
+    </div>
+    <div><button type="button" class="btn small" id="setup-add" data-act="setup-add"${dis}>+ הוספת קורס</button></div>
+    ${setupErr[sid] ? `<p class="err" role="alert">${esc(setupErr[sid])}</p>` : ''}
+    <div class="setup-actions"><button type="submit" class="btn primary" id="setup-save"${dis}>שמירה והתחלה</button></div>
+  </form>`;
+}
+function saveSetup(sid) {
+  const rows = draftFor(sid);
+  rows.forEach(r => { r.bad = false; r.badName = false; r.badL = false; });
+  const on = rows.filter(r => r.on);
+  if (!on.length) { setupErr[sid] = 'בחרו או הוסיפו לפחות קורס אחד.'; renderMain(); return; }
+  let missingN = 0, missingName = 0;
+  for (const r of on) {
+    const v = String(r.allowed).trim();
+    if (v === '' || !/^\d+$/.test(v) || Number(v) > 20) { r.bad = true; missingN++; }
+    if (r.custom && !String(r.name).trim()) { r.badName = true; missingName++; }
+    const l = String(r.lessons ?? '').trim();
+    if (l && (!/^\d+$/.test(l) || Number(l) < 1 || Number(l) > 40)) { r.badL = true; missingN++; }
+  }
+  if (missingN || missingName) {
+    const parts = [];
+    if (missingN) parts.push(missingN === 1 ? 'בקורס אחד חסר מספר היעדרויות מותרות או שמספר השיעורים לא תקין.' : `ב-${missingN} קורסים חסר מספר היעדרויות מותרות או שמספר השיעורים לא תקין.`);
+    if (missingName) parts.push('חסר שם קורס.');
+    setupErr[sid] = parts.join(' ');
+    renderMain();
+    const first = document.querySelector('#setup-form .bad'); if (first) first.focus();
+    return;
+  }
+  const list = on.map(r => { const l = String(r.lessons ?? '').trim(); return { id: r.id || newId(), name: String(r.name).trim(), time: String(r.time || '').trim(), wd: Number(r.wd), lessons: l ? Number(l) : null, allowed: Number(r.allowed) }; });
+  me = { ...me, courses: { ...me.courses, [sid]: list } };
+  delete drafts[sid]; delete setupErr[sid];
+  renderAll(); writeMe(); toast('הקורסים נשמרו. אפשר להתחיל לסמן.');
+}
+
+/* ===================== courses: views ===================== */
+function semTabsHTML() {
+  return `<div class="tabs" role="tablist" aria-label="סמסטר">` + SEM_DAYS.map(s =>
+    `<button type="button" role="tab" id="tab-${s.id}" data-act="tab" data-sem="${s.id}" aria-selected="${tab === s.id}"><b>${s.name}</b><small>${s.range}</small></button>`).join('') + `</div>`;
+}
+function alertsHTML() {
+  const lv = levelsFor(tab).filter(x => x.lvl);
+  if (!lv.length) return '';
+  const reds = lv.filter(x => x.lvl === 'r'), yel = lv.filter(x => x.lvl === 'y');
+  let h = '<div class="alerts" role="alert">';
+  if (reds.length) h += `<div class="alert r"><b>${reds.length === 1 ? 'קורס אחד במצב אדום' : `${reds.length} קורסים במצב אדום`}</b><ul>${reds.map(x => `<li>${esc(warnText(x.c, x.r))}</li>`).join('')}</ul></div>`;
+  if (yel.length) h += `<div class="alert y"><b>זהירות</b><ul>${yel.map(x => `<li>${esc(warnText(x.c, x.r))}</li>`).join('')}</ul></div>`;
+  return h + '</div>';
+}
+function todayHTML() {
+  const sem = semById(tab);
+  const inSem = TODAY >= ts(sem.start) && TODAY <= ts(sem.end);
+  const sd = studyDates(tab);
+  if (TODAY < ts(sem.start)) { const f = sd.find(d => !d.brk); return `<section class="card"><div class="today-head"><span class="label">${sem.name}</span><span class="today-date">מתחיל ב-<span class="num">${sem.startText}</span></span></div>${f ? `<p class="note">השיעור הראשון: ${dayName(f.t)}, <span class="num">${dm(f.t)}</span>.</p>` : ''}</section>`; }
+  const missed = sd.filter(d => d.t < TODAY && !d.brk && daySummary(d.key).cls === 'warn');
+  const td = inSem ? sd.find(d => d.t === TODAY && !d.brk) : null;
+  if (td) {
+    const sum = daySummary(td.key);
+    return `<section class="card" aria-label="היום"><div class="today-head"><span class="label">היום</span><span class="today-date">${dayName(TODAY)}, <span class="num">${dm(TODAY)}</span></span></div>
+      ${NOTES[td.key] ? `<p class="note">${esc(NOTES[td.key])}.</p>` : ''}
+      ${sum.text && sum.cls !== 'warn' ? `<p class="sum ${sum.cls}">${esc(sum.text)}</p>` : ''}
+      ${editorHTML(td.key, 'today')}
+      ${missed.length ? `<p class="note">יש עוד ${missed.length === 1 ? 'יום לימודים אחד שלא סומן' : `${missed.length} ימי לימודים שלא סומנו`} ברשימה למטה.</p>` : ''}</section>`;
+  }
+  if (missed.length) {
+    const last = missed[missed.length - 1];
+    return `<section class="card"><div class="today-head"><span class="label">${missed.length === 1 ? 'יום לימודים אחד לא סומן' : `${missed.length} ימי לימודים לא סומנו`}</span><span class="today-date">${dayName(last.t)}, <span class="num">${dm(last.t)}</span></span></div>${editorHTML(last.key, 'today')}</section>`;
+  }
+  const next = sd.find(d => d.t > TODAY && !d.brk);
+  if (!next) return `<section class="card"><div class="today-head"><span class="label">${sem.name}</span><span class="today-date">הסמסטר הסתיים</span></div></section>`;
+  const n = Math.round((next.t - TODAY) / DAY);
+  return `<section class="card"><div class="today-head"><span class="label">השיעור הבא</span><span class="today-date">${dayName(next.t)}, <span class="num">${dm(next.t)}</span></span></div><p class="note">${n === 1 ? 'מחר' : `בעוד ${n} ימים`}. כל ימי הלימודים שעברו סומנו.</p></section>`;
+}
+function talliesHTML() {
+  const sem = semById(tab); const list = coursesFor(tab);
+  if (!list.length) return `<div class="empty"><b>אין קורסים בסמסטר הזה.</b><span>אפשר להוסיף קורסים בחלק „עריכת הקורסים" למטה.</span></div>`;
+  const started = ts(sem.start) <= TODAY;
+  return `<div class="grid">` + list.map(c => {
+    const r = tallyCourse(sem, c); const lvl = levelOf(r);
+    let pk = 'ok', ptxt = 'תקין';
+    if (lvl === 'r') { pk = 'r'; ptxt = r.left < 0 ? `חריגה של ${-r.left}` : r.allowed === 0 ? 'אסור להיעדר' : 'אין יותר היעדרויות'; }
+    else if (lvl === 'y') { pk = 'y'; ptxt = 'נותרה היעדרות אחת'; }
+    else if (!started) { pk = 'idle'; ptxt = 'טרם התחיל'; }
+    const strip = r.cells.map(({ d, st }) => `<i class="sq ${st}${d.t === TODAY ? ' today' : ''}" title="${dm(d.t)}${st && st !== 'unmarked' ? ' · ' + ST[st] : ''}"></i>`).join('');
+    const meter = r.allowed == null
+      ? `<div class="meter"><span class="n">${r.absent}</span><span class="u">היעדרויות (המכסה לא הוגדרה)</span></div>`
+      : r.left >= 0
+        ? `<div class="meter ${lvl}"><span class="n">${r.left}</span><span class="u">${r.left === 1 ? 'היעדרות נותרה' : 'היעדרויות נותרו'} מתוך ${r.allowed}</span></div>`
+        : `<div class="meter r"><span class="n">${-r.left}</span><span class="u">מעבר למכסה של ${r.allowed}</span></div>`;
+    return `<article class="card${lvl ? ' lvl-' + lvl : ''}">
+      <div class="cc-head">${courseName(c)}<span class="pill ${pk}">${ptxt}</span></div>
+      ${Number(c.lessons) > 0 ? `<p class="note">מספר השיעורים לפי מה שהגדרתם: ${c.lessons}</p>` : ''}
+      ${meter}
+      ${(() => { const held = r.present + r.absent; const att = held ? r.present / held : null;
+        const absShare = r.total ? r.absent / r.total : 0; const mark = r.total && r.allowed != null ? r.allowed / r.total * 100 : null;
+        return barHTML('נוכחות עד עכשיו', held ? pct1(att) : '—', att == null ? 0 : att * 100, 'ok')
+          + barHTML(`היעדרויות מתוך ${r.total} שיעורים`, pct1(absShare), absShare * 100, lvl || 'ok', mark)
+          + (mark != null ? `<span class="note">הקו השחור = המכסה: ${r.allowed} היעדרויות, ${pct1(r.allowed / r.total)} מהשיעורים</span>` : ''); })()}
+      <div class="strip" aria-hidden="true">${strip}</div>
+      <ul class="facts">
+        <li><span>נכחתי</span><b>${r.present} מתוך ${r.total} שיעורים</b></li>
+        <li><span>נעדרתי</span><b>${r.absent}${r.allowed != null ? ` מתוך ${r.allowed} מותרות` : ''}</b></li>
+        <li><span>היעדרות אחת</span><b dir="ltr">${pct(r.share)}</b></li>
+        <li><span>נוכחות סופית אם תגיעו לכל השאר</span><b dir="ltr">${pct(r.best)}</b></li>
+        ${r.cancelled ? `<li><span>שיעורים שבוטלו</span><b>${r.cancelled}</b></li>` : ''}
+        ${r.unmarked ? `<li><span>עברו ולא סומנו</span><b>${r.unmarked}</b></li>` : ''}
+      </ul>
+    </article>`;
+  }).join('') + `</div>
+  <div class="legend" aria-hidden="true"><span><i class="sq present"></i>נכחתי</span><span><i class="sq absent"></i>נעדרתי</span><span><i class="sq cancelled"></i>בוטל</span><span><i class="sq unmarked"></i>עבר ולא סומן</span><span><i class="sq"></i>עתידי</span></div>`;
+}
+function ledgerHTML() {
+  const sem = semById(tab);
+  return `<section class="section" aria-labelledby="ledger-h"><h2 id="ledger-h">כל ימי הלימודים · ${sem.name}</h2><ul class="days">` + studyDates(tab).map(d => {
+    if (d.brk) return `<li class="day brk"><div class="day-head"><span class="d"><small>${dayName(d.t)}</small><span class="num">${dm(d.t)}</span></span><span class="sum brk">פגרה · ${esc(d.brk)}</span></div></li>`;
+    const sum = daySummary(d.key); const open = openDays.has(d.key);
+    return `<li class="day${d.t === TODAY ? ' today' : ''}${open ? ' open' : ''}">
+      <button type="button" class="day-head" id="dh-${d.key}" data-act="toggle" data-k="${d.key}" aria-expanded="${open}">
+        <span class="d"><small>${dayName(d.t)}</small><span class="num">${dm(d.t)}</span>${d.t === TODAY ? '<small>היום</small>' : ''}</span>
+        <span class="sum ${sum.cls}">${esc(sum.text)}</span><span class="chev" aria-hidden="true">▾</span>
+      </button>
+      ${open ? `<div class="day-body">${NOTES[d.key] ? `<p class="note">${esc(NOTES[d.key])}</p>` : ''}${editorHTML(d.key, 'led')}</div>` : ''}
+    </li>`;
+  }).join('') + `</ul></section>`;
+}
+function manageHTML() {
+  const list = coursesFor(tab); const dis = ready() ? '' : ' disabled';
+  return `<details class="manage" id="manage-${tab}"${manageOpen ? ' open' : ''}>
+    <summary><span>עריכת הקורסים</span><span class="note">${list.length} קורסים</span></summary>
+    <div class="manage-body">
+      <p class="note">אפשר לשנות לכל קורס את היום בשבוע, את מספר השיעורים בסמסטר (ריק = לפי לוח השנה) ואת מספר ההיעדרויות המותרות, למחוק קורס או להוסיף קורס חדש.</p>
+      ${list.length ? `<ul class="mlist">${list.map(c => `<li class="mrow">${courseName(c)}
+        <div class="opts">
+        <label class="allow">יום${wdSelect(`m-${esc(c.id)}-wd`, `data-mwd="${esc(c.id)}"`, wdOf(c), dis)}</label>
+        <label class="allow">שיעורים<input class="field n" type="number" inputmode="numeric" min="1" max="40" step="1" id="m-${esc(c.id)}-lessons" data-mles="${esc(c.id)}" value="${Number(c.lessons) > 0 ? c.lessons : ''}" placeholder="${lessonsOnWd(tab, wdOf(c))}"${dis}></label>
+        <label class="allow">מותר<input class="field n" type="number" inputmode="numeric" min="0" max="20" step="1" id="m-${esc(c.id)}-allowed" data-mallow="${esc(c.id)}" value="${Number.isFinite(c.allowed) ? c.allowed : ''}"${dis}></label>
+        </div>
+        ${confirmDelete === c.id
+          ? `<span class="answers"><button type="button" class="btn small danger" id="del-yes-${esc(c.id)}" data-act="del-yes" data-c="${esc(c.id)}"${dis}>למחוק את הקורס</button><button type="button" class="btn small" id="del-no-${esc(c.id)}" data-act="del-no">ביטול</button></span>`
+          : `<button type="button" class="btn small ghost" id="del-${esc(c.id)}" data-act="del" data-c="${esc(c.id)}"${dis}>מחיקה</button>`}
+      </li>`).join('')}</ul>` : ''}
+      <form class="add" id="add-form">
+        <label class="wide">שם הקורס<input class="field" id="add-name" name="name"${dis}></label>
+        <label>שעות<input class="field" id="add-time" name="time" dir="ltr" placeholder="10:00–12:00"${dis}></label>
+        <label>יום${wdSelect('add-wd', 'name="wd"', WEEKDAY, dis)}</label>
+        <label>שיעורים (לא חובה)<input class="field n" id="add-lessons" name="lessons" type="number" inputmode="numeric" min="1" max="40" step="1"${dis}></label>
+        <label>היעדרויות מותרות<input class="field n" id="add-allowed" name="allowed" type="number" inputmode="numeric" min="0" max="20" step="1"${dis}></label>
+        <div class="full"><button type="submit" class="btn" id="add-btn"${dis}>הוספת קורס ל${semById(tab).name}</button></div>
+      </form>
+    </div>
+  </details>`;
+}
+function semSummaryHTML() {
+  const sem = semById(tab); const list = coursesFor(tab); if (!list.length) return '';
+  let P = 0, A = 0, allowedSum = 0;
+  for (const c of list) { const r = tallyCourse(sem, c); P += r.present; A += r.absent; if (r.allowed != null) allowedSum += r.allowed; }
+  const att = P + A ? P / (P + A) : null;
+  const k = { full: 0, part: 0, abs: 0, none: 0, un: 0 };
+  for (const d of studyDates(tab)) {
+    if (d.brk || d.t > TODAY) continue;
+    const on = coursesOn(tab, d.wd); const map = dayMap(d.key); const vals = on.map(c => map[c.id]);
+    if (!vals.some(Boolean)) { k.un++; continue; }
+    const held = vals.filter(v => v && v !== 'cancelled');
+    if (!held.length) k.none++;
+    else if (held.every(v => v === 'present') && vals.every(Boolean)) k.full++;
+    else if (held.every(v => v === 'absent')) k.abs++;
+    else k.part++;
+  }
+  const passed = k.full + k.part + k.abs + k.none + k.un;
+  const seg = (n, cls) => n ? `<i class="${cls}" style="width:${n / passed * 100}%"></i>` : '';
+  const row = (cls, txt, n) => `<li><i class="sw ${cls}"></i>${txt}<b>${n} (${passed ? Math.round(n / passed * 100) : 0}%)</b></li>`;
+  return `<section class="card" aria-labelledby="sum-h"><h2 id="sum-h">סיכום · ${sem.name}</h2>
+    ${barHTML('נוכחות בכל הקורסים', P + A ? pct1(att) : '—', att == null ? 0 : att * 100, 'ok')}
+    <p class="note">נכחתי ב-${P} שיעורים, נעדרתי מ-${A}${allowedSum ? `, מתוך ${allowedSum} היעדרויות מותרות בכל הקורסים יחד (${pct1(A / allowedSum)} מהמכסה)` : ''}.</p>
+    ${passed ? `<div class="barrow"><div class="lbl"><span>ימי לימודים שעברו</span><b>${passed}</b></div><div class="bar stack" role="img" aria-label="ימי לימודים שעברו">${seg(k.full, 'ok')}${seg(k.part, 'y')}${seg(k.abs, 'r')}${seg(k.none, 'c')}${seg(k.un, 'u')}</div></div>
+    <ul class="dlegend">${row('ok', 'נכחתי בכל השיעורים', k.full)}${row('y', 'נעדרתי מחלק מהשיעורים', k.part)}${row('r', 'נעדרתי מכל השיעורים', k.abs)}${k.none ? row('c', 'לא היו שיעורים', k.none) : ''}${k.un ? row('u', 'לא סומן', k.un) : ''}</ul>`
+    : `<p class="note">עוד לא עברו ימי לימודים בסמסטר הזה.</p>`}
+  </section>`;
+}
+function coursesViewHTML() {
+  const head = semTabsHTML();
+  if (!isSetup(tab)) return head + setupHTML(tab);
+  return head + alertsHTML() + todayHTML() + semSummaryHTML() + `<section class="section" aria-labelledby="cc-h"><h2 id="cc-h">לפי קורס</h2>${talliesHTML()}</section>` + ledgerHTML() + manageHTML();
+}
+
+/* ===================== practicum: views ===================== */
+const pracLabel = t => `יום ${HE_WD[new Date(t).getUTCDay()]}, ${dm(t)}`;
+function pracSetupHTML() {
+  if (!pracDraft) { const p = me.prac || PRAC_DEFAULT; pracDraft = { days: [...p.days], start: p.start, end: p.end, winterOnce: p.winterOnce !== false, total: me.prac && me.prac.total ? String(me.prac.total) : '' }; }
+  const d = pracDraft; const dis = ready() ? '' : ' disabled';
+  const calc = (d.days.length && d.start && d.end && d.start <= d.end) ? pracSchedule({ ...d, total: null, marks: {} }).length : 0;
+  return `<form class="card pform" id="prac-form" novalidate>
+    <h2>${me.prac ? 'הגדרות ההכשרה המעשית' : 'הגדרת ההכשרה המעשית'}</h2>
+    <p class="note">בחרו את ימי ההכשרה ואת התאריכים. הדף מוריד חגים שבהם מקומות ההכשרה סגורים (פסח, יום העצמאות, שבועות) ומחשב כמה ימים יוצאים. אם במחלקה נקבע מספר אחר, רשמו אותו.</p>
+    <div class="row"><span class="label">ימי ההכשרה</span></div>
+    <div class="wds">${[0,1,2,3,4,5].map(i => `<label><input type="checkbox" id="pd-${i}" data-pf="day" data-v="${i}"${d.days.includes(i) ? ' checked' : ''}${dis}>יום ${HE_WD[i]}</label>`).join('')}</div>
+    <div class="row">
+      <label class="f">תאריך התחלה<input class="field" type="date" id="pf-start" data-pf="start" value="${esc(d.start)}"${dis}></label>
+      <label class="f">תאריך סיום<input class="field" type="date" id="pf-end" data-pf="end" value="${esc(d.end)}"${dis}></label>
+    </div>
+    <label class="chk" style="min-width:0"><input type="checkbox" id="pf-winter" data-pf="winter"${d.winterOnce ? ' checked' : ''}${dis}>בחופשת הסמסטר (17.01–27.02.2027) ההכשרה פעם בשבוע, ביום הראשון מבין ימי ההכשרה</label>
+    <p class="calc">לפי הלוח יוצאים <b class="num">${calc}</b> ימי הכשרה${calc ? `, ויום אחד = <b class="num" dir="ltr">${fix2(100 / calc)}%</b>` : ''}.</p>
+    <div class="row"><label class="f">סה״כ ימי הכשרה (אם שונה מהחישוב)<input class="field n" type="number" inputmode="numeric" min="1" max="300" id="pf-total" data-pf="total" value="${esc(d.total)}" placeholder="${calc || ''}"${dis}></label></div>
+    ${pracErr ? `<p class="err" role="alert">${esc(pracErr)}</p>` : ''}
+    <div class="setup-actions"><button type="submit" class="btn primary" id="pf-save"${dis}>שמירה</button>${me.prac ? `<button type="button" class="btn" id="pf-cancel" data-act="prac-cancel">ביטול</button>` : ''}</div>
+  </form>`;
+}
+function savePracSetup() {
+  const d = pracDraft; pracErr = '';
+  if (!d.days.length) pracErr = 'בחרו לפחות יום הכשרה אחד.';
+  else if (!d.start || !d.end || d.start > d.end) pracErr = 'בדקו את תאריכי ההתחלה והסיום.';
+  else if (String(d.total).trim() && (!/^\d+$/.test(String(d.total).trim()) || Number(d.total) < 1 || Number(d.total) > 300)) pracErr = 'סה״כ ימים צריך להיות מספר בין 1 ל-300.';
+  if (pracErr) { renderMain(); return; }
+  me = { ...me, prac: { days: [...d.days].sort(), start: d.start, end: d.end, winterOnce: d.winterOnce, total: String(d.total).trim() ? Number(d.total) : null, marks: me.prac ? me.prac.marks : {} } };
+  pracDraft = null; pracEditing = false;
+  renderAll(); writeMe(); toast('הגדרות ההכשרה נשמרו.');
+}
+function pracSegHTML(key, cur) {
+  const dis = ready() ? '' : ' disabled';
+  return `<div class="seg" role="group" aria-label="סימון">` + [['done','עבדתי'],['missed','לא עבדתי']].map(([s, l]) =>
+    `<button type="button" id="ps-${key}-${s}" data-act="pmark" data-k="${key}" data-s="${s}" aria-pressed="${cur === s}"${dis}>${l}</button>`).join('') + '</div>';
+}
+function pracViewHTML() {
+  if (!me.prac || pracEditing) return pracSetupHTML();
+  const p = me.prac; const T = pracTally(p); const dis = ready() ? '' : ' disabled';
+  const todayKey = iso(TODAY); const todayIn = T.sched.find(d => d.key === todayKey);
+  let todayCard;
+  if (todayIn) {
+    todayCard = `<section class="card"><div class="today-head"><span class="label">היום</span><span class="today-date">${pracLabel(TODAY)}</span></div><span class="q">עבדתם היום בהכשרה?</span>${pracSegHTML(todayKey, p.marks[todayKey])}</section>`;
+  } else {
+    const un = T.sched.filter(d => d.t < TODAY && !p.marks[d.key]);
+    const next = T.sched.find(d => d.t > TODAY);
+    if (un.length) { const last = un[un.length - 1]; todayCard = `<section class="card"><div class="today-head"><span class="label">${un.length === 1 ? 'יום הכשרה אחד לא סומן' : `${un.length} ימי הכשרה לא סומנו`}</span><span class="today-date">${pracLabel(last.t)}</span></div><span class="q">עבדתם ביום הזה?</span>${pracSegHTML(last.key, p.marks[last.key])}</section>`; }
+    else if (next) { const n = Math.round((next.t - TODAY) / DAY); todayCard = `<section class="card"><div class="today-head"><span class="label">יום ההכשרה הבא</span><span class="today-date">${pracLabel(next.t)}</span></div><p class="note">${n === 1 ? 'מחר' : `בעוד ${n} ימים`}.</p></section>`; }
+    else todayCard = `<section class="card"><div class="today-head"><span class="label">ההכשרה</span><span class="today-date">הסתיימה</span></div></section>`;
+  }
+  const doneSet = new Set(Object.keys(p.marks).filter(k => p.marks[k] === 'done'));
+  const strip = T.sched.map(d => { const m = p.marks[d.key]; const cls = m === 'done' ? 'done' : m === 'missed' ? 'missed' : d.t <= TODAY ? 'unmarked' : ''; return `<i class="sq ${cls}${d.t === TODAY ? ' today' : ''}" title="${pracLabel(d.t)}"></i>`; }).join('');
+  const months = {}; for (const d of T.sched) { const k = d.key.slice(0, 7); (months[k] = months[k] || []).push(d); }
+  if (!pracOpenMonths) pracOpenMonths = new Set([iso(TODAY).slice(0, 7)]);
+  const ledger = Object.keys(months).map(k => {
+    const list = months[k]; const [y, m] = k.split('-').map(Number);
+    const dn = list.filter(d => p.marks[d.key] === 'done').length;
+    return `<details class="month" data-month="${k}"${pracOpenMonths.has(k) ? ' open' : ''}><summary><span>${HE_MONTH[m - 1]} ${y}</span><span class="note">עבדתי ${dn} מתוך ${list.length}</span></summary><ul>${list.map(d =>
+      `<li class="prow${d.t === TODAY ? ' today' : ''}"><span class="d"><span>${pracLabel(d.t)}</span>${d.winter ? '<span class="tag">חופשת סמסטר</span>' : ''}${d.t <= TODAY && !p.marks[d.key] ? '<span class="rem y">לא סומן</span>' : ''}</span>${pracSegHTML(d.key, p.marks[d.key])}</li>`).join('')}</ul></details>`;
+  }).join('');
+  const extras = T.extra.length ? `<ul class="mlist">${T.extra.map(k => `<li class="mrow"><span>${pracLabel(ts(k))} <span class="tag">מחוץ ללוח</span> · ${p.marks[k] === 'done' ? 'עבדתי' : 'לא עבדתי'}</span><button type="button" class="btn small ghost danger" id="px-${k}" data-act="pextra-del" data-k="${k}">הסרה</button></li>`).join('')}</ul>` : '';
+  return `${todayCard}
+    <section class="card" aria-live="polite">
+      <span class="label">נותרו להכשרה</span>
+      <div class="prac-big"><span class="n">${fix2(T.remaining)}%</span></div>
+      <form class="row-inline" id="ptotal-form"><label class="allow">סה״כ ימי הכשרה<input class="field n" type="number" inputmode="numeric" min="1" max="300" id="pt-total" name="total" value="${T.total}"${dis}></label><button type="submit" class="btn small" id="pt-save"${dis}>עדכון</button>${p.total ? `<button type="button" class="btn small ghost" id="pt-reset" data-act="ptotal-reset"${dis}>לפי הלוח (${T.sched.length})</button>` : ''}</form>
+      <div class="meta"><span>עבדתי <b>${T.done}</b> מתוך <b>${T.total}</b> ימים</span><span>נותרו <b>${Math.max(0, T.total - T.done)}</b> ימים</span><span>יום אחד = <b dir="ltr">${fix2(T.per)}%</b></span>${T.missed ? `<span>ימים שהוחסרו: <b>${T.missed}</b></span>` : ''}</div>
+      ${(() => { const dP = T.total ? T.done / T.total * 100 : 0, mP = T.total ? T.missed / T.total * 100 : 0;
+        const held = T.done + T.missed;
+        return `<div class="barrow"><div class="lbl"><span>מתוך ${T.total} ימי הכשרה</span><b dir="ltr">${fix2(dP)}% / ${fix2(mP)}%</b></div><div class="bar stack" role="img" aria-label="עבדתי ${fix2(dP)}%, הוחסרו ${fix2(mP)}%"><i class="acc" style="width:${clampPct(dP)}%"></i><i class="r" style="width:${clampPct(mP)}%"></i></div></div>
+          <ul class="dlegend"><li><i class="sw acc"></i>עבדתי<b dir="ltr">${T.done} · ${fix2(dP)}%</b></li><li><i class="sw r"></i>הוחסרו (צריך להשלים)<b dir="ltr">${T.missed} · ${fix2(mP)}%</b></li></ul>`
+          + barHTML('נוכחות בהכשרה עד עכשיו', held ? pct1(T.done / held) : '—', held ? T.done / held * 100 : 0, 'ok'); })()}
+      <div class="pstrip" aria-hidden="true">${strip}</div>
+      ${T.unmarked ? `<p class="note">עברו ולא סומנו: ${T.unmarked} ימים.</p>` : ''}
+    </section>
+    <section class="section" aria-labelledby="pl-h"><h2 id="pl-h">ימי ההכשרה</h2>${ledger}</section>
+    <section class="card"><h2>יום הכשרה מחוץ ללוח</h2><p class="note">אם עבדתם ביום אחר (השלמה או יום נוסף), הוסיפו אותו כאן.</p>
+      <form class="pform" id="pextra-form"><div class="row"><label class="f">תאריך<input class="field" type="date" id="px-date" name="date"${dis}></label><button type="submit" class="btn" id="px-add"${dis}>הוספה</button></div></form>${extras}</section>
+    <div><button type="button" class="btn" id="prac-edit" data-act="prac-edit"${dis}>שינוי הגדרות ההכשרה</button></div>`;
+}
+
+/* ===================== login & profile (Google Sheet mode) ===================== */
+let needLogin = false, loginBusy = false, gisReady = false, gisTried = 0;
+let account = null;          // { nick } from the server
+let gHint = null;            // { given, family, emailLocal } decoded locally from the Google token, never sent anywhere
+let profileErr = '', profileBusy = false;
+const prDraft = { name: null, nick: '' };
+const NAME_KEY = 'bgu-att-name';
+const localName = () => lsGet(NAME_KEY) || '';
+const needProfile = () => mode === 'remote' && !needLogin && loaded && (!account || !account.nick || !localName());
+
+function loginHTML() {
+  return `<section class="card login">
+    <h2>כניסה</h2>
+    <p class="note">נכנסים עם חשבון Google כדי שהסימונים יישמרו ויופיעו בכל מכשיר.</p>
+    <div class="gbtn" id="gbtn">${gisTried > 50 ? '<p class="err">לא ניתן לטעון את הכניסה של Google. בדקו את החיבור לאינטרנט ורעננו את הדף.</p>' : '<span class="note">טוען את כפתור הכניסה…</span>'}</div>
+    ${loginBusy ? '<p class="note">נכנסים…</p>' : ''}
+    <p class="note">מה נשמר ואיפה: בגיליון המשותף נשמרים רק כינוי שתבחרו והסימונים. כתובת ה-Gmail לא נשמרת בגיליון, ובמקומה נשמר קוד שאי אפשר לשחזר ממנו את הכתובת. השם האמיתי שלכם נשאר רק במכשיר שלכם.</p>
+  </section>`;
+}
+function profileHTML() {
+  const hasNick = account && account.nick;
+  return `<form class="card pform" id="profile-form" novalidate>
+    <h2>פרטים</h2>
+    <label class="f">השם שלכם<input class="field" id="pr-name" name="name" autocomplete="name" value="${esc(prDraft.name != null ? prDraft.name : localName())}"></label>
+    <p class="note">השם נשמר רק במכשיר הזה ומופיע רק לכם. הוא לא נשלח לשום מקום.</p>
+    ${hasNick ? `<p>הכינוי שלכם: <b>${esc(account.nick)}</b></p>` : `<label class="f">כינוי בדוי<input class="field" id="pr-nick" name="nick" maxlength="24" autocomplete="off" placeholder="למשל: ינשוף כחול" value="${esc(prDraft.nick)}"></label>
+    <p class="note">הסימונים נשמרים בגיליון תחת הכינוי בלבד. בחרו כינוי שלא קשור אליכם: בלי השם, ראשי התיבות, תאריך לידה או מספר טלפון. 2–24 תווים.</p>`}
+    ${profileErr ? `<p class="err" role="alert">${esc(profileErr)}</p>` : ''}
+    <div class="setup-actions"><button type="submit" class="btn primary" id="pr-save"${profileBusy ? ' disabled' : ''}>המשך</button></div>
+  </form>`;
+}
+function nickProblem(nick, name) {
+  if (!/^[\p{L}\p{N} _\-]{2,24}$/u.test(nick)) return 'הכינוי צריך להכיל 2–24 אותיות, ספרות, רווח, מקף או קו תחתון.';
+  const n = nick.toLowerCase().replace(/[\s_\-]/g, '');
+  const parts = [name, gHint && gHint.given, gHint && gHint.family, gHint && gHint.emailLocal]
+    .filter(Boolean).flatMap(x => String(x).toLowerCase().split(/[\s._\-]+/)).filter(x => x.length >= 3);
+  if (parts.some(x => n.includes(x))) return 'הכינוי דומה לשם שלכם או לכתובת המייל. בחרו כינוי שלא מזהה אתכם.';
+  return '';
+}
+
+/* ===================== render ===================== */
+function renderStatus() {
+  let c = '', txt = 'טוען…', extra = '';
+  if (mode === 'cloud') { c = 'ok'; txt = 'הנתונים נשמרים בחשבון שלכם וגלויים רק לכם.'; }
+  else if (mode === 'local' && !storageOk) { c = 'local'; txt = 'הדפדפן לא מאפשר לשמור נתונים, למשל במצב גלישה בסתר. הסימונים יימחקו כשתסגרו את הדף.'; }
+  else if (mode === 'local') { c = 'local'; txt = inArtifact ? 'הנתונים נשמרים רק בדפדפן הזה במכשיר הזה.' : 'הנתונים נשמרים רק בדפדפן הזה במכשיר הזה. מדי פעם הורידו גיבוי.'; }
+  else if (mode === 'remote') {
+    if (needLogin) { txt = 'צריך להיכנס.'; }
+    else {
+      const who = [localName(), account && account.nick ? `(${account.nick})` : ''].filter(Boolean).join(' ');
+      const sync = { saving: ['', 'שומר…'], saved: ['ok', 'נשמר'], offline: ['local', 'אין חיבור. הסימונים שמורים במכשיר ויישלחו כשהחיבור יחזור.'], error: ['local', 'השמירה נכשלה. ננסה שוב בעוד רגע.'], idle: ['ok', 'מחובר'] }[syncState] || ['ok', ''];
+      c = sync[0]; txt = `${who ? 'שלום ' + who + ' · ' : ''}${sync[1]}`;
+      extra = `<button type="button" class="btn small ghost" id="logout" data-act="logout">יציאה</button>`;
+    }
+  }
+  document.getElementById('status').innerHTML = `<span class="dot ${c}"></span><span>${esc(txt)}</span>${extra}`;
+  const bk = document.getElementById('backup');
+  const showBackup = mode === 'local' && !inArtifact;
+  bk.hidden = !showBackup;
+  if (showBackup) bk.innerHTML = `<span class="label">גיבוי</span><button type="button" class="btn small" id="exp-btn" data-act="export">הורדת גיבוי</button><label class="btn small" for="imp-file" id="imp-label" tabindex="0">טעינה מגיבוי</label>`;
+}
+function renderMain() {
+  const el = document.getElementById('main');
+  const m = document.querySelector('details.manage'); if (m) manageOpen = m.open;
+  document.querySelectorAll('details.month').forEach(d => { if (pracOpenMonths) { d.open ? pracOpenMonths.add(d.dataset.month) : pracOpenMonths.delete(d.dataset.month); } });
+  if (mode === 'remote' && needLogin) { el.innerHTML = loginHTML(); mountGisButton(); return; }
+  if (!loaded) { el.innerHTML = `<div class="empty">${mode === 'remote' && syncState === 'offline' ? 'אין חיבור לאינטרנט. התחברו ורעננו את הדף.' : 'טוען את הנתונים…'}</div>`; return; }
+  if (needProfile()) { el.innerHTML = profileHTML(); return; }
+  const views = `<div class="views" role="tablist" aria-label="תצוגה"><button type="button" role="tab" id="view-courses" data-act="view" data-v="courses" aria-selected="${view === 'courses'}">נוכחות בקורסים</button><button type="button" role="tab" id="view-prac" data-act="view" data-v="prac" aria-selected="${view === 'prac'}">הכשרה מעשית</button></div>`;
+  el.innerHTML = views + (view === 'prac' ? pracViewHTML() : coursesViewHTML());
+}
+function renderAll() {
+  const a = document.activeElement; const focusId = a && a.id;
+  renderStatus(); renderMain();
+  if (focusId) { const f = document.getElementById(focusId); if (f && f !== document.activeElement) f.focus({ preventScroll: true }); }
+}
+let toastTimer;
+function toast(msg, kind) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast' + (kind ? ' ' + kind : ''); el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, kind ? 6000 : 3400);
+}
+
+/* ===================== saving ===================== */
+const LS_KEY = 'bgu-attendance-he-v1';
+let db = null, uid = null;
+const mePath = () => `data/users/${uid}/state`;
+const inflight = {}, wanted = {};
+function saveLocal() { if (!lsSet(LS_KEY, JSON.stringify(me)) && storageOk) { storageOk = false; renderStatus(); } }
+async function persistCloud(path) {
+  if (inflight[path]) return;
+  inflight[path] = true;
+  try { while (path in wanted) { const val = wanted[path]; delete wanted[path]; await db.doc(path).set(val); } }
+  catch (e) {
+    delete wanted[path];
+    if (e && e.code === 'invalid_argument') { mode = 'local'; saveLocal(); toast('לא ניתן לשמור בחשבון. הנתונים יישמרו בדפדפן הזה.'); renderAll(); }
+    else toast('השמירה נכשלה. נסו שוב.');
+  } finally { inflight[path] = false; }
+}
+
+/* Google Sheet backend (hosted version) */
+const RS = 'bgu-att-session-v1', RC = 'bgu-att-cache-v1';
+let session = null, syncState = 'idle', editVer = 0, savedVer = 0, saveTimer = null, saving = false;
+async function api(payload) {
+  const res = await fetch(CFG.apiUrl, { method: 'POST', body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error('http ' + res.status);
+  return res.json();
+}
+function cacheRemote() { lsSet(RC, JSON.stringify({ nick: account && account.nick || '', state: me, pending: editVer !== savedVer })); }
+function buildSummary() {
+  const rows = [];
+  for (const s of SEMS) for (const c of coursesFor(s.id)) {
+    const r = tallyCourse(semById(s.id), c);
+    rows.push({ type: 'course', sem: s.name, name: c.name, allowed: r.allowed, absent: r.absent, left: r.left, present: r.present, total: r.total });
+  }
+  if (me.prac) { const T = pracTally(me.prac); rows.push({ type: 'prac', name: 'הכשרה מעשית', absent: T.missed, present: T.done, total: T.total, remainingPct: Math.round(T.remaining * 100) / 100 }); }
+  return rows;
+}
+function scheduleSave(delay) { clearTimeout(saveTimer); saveTimer = setTimeout(doSave, delay == null ? 700 : delay); }
+function doSave() {
+  if (saving || editVer === savedVer || !session || needLogin) return;
+  saving = true; const v = editVer; syncState = 'saving'; renderStatus();
+  api({ action: 'save', session, state: me, summary: buildSummary() }).then(r => {
+    saving = false;
+    if (r.ok) { savedVer = Math.max(savedVer, v); syncState = editVer === savedVer ? 'saved' : 'saving'; cacheRemote(); renderStatus(); if (editVer !== savedVer) scheduleSave(300); }
+    else if (r.error === 'auth') { needLogin = true; session = null; lsDel(RS); toast('פג תוקף הכניסה. היכנסו שוב, הסימונים שמורים במכשיר.'); renderAll(); }
+    else { syncState = 'error'; renderStatus(); scheduleSave(15000); }
+  }).catch(() => { saving = false; syncState = 'offline'; renderStatus(); scheduleSave(20000); });
+}
+window.addEventListener('online', () => { if (mode === 'remote' && editVer !== savedVer) scheduleSave(0); });
+
+function writeMe() {
+  if (mode === 'cloud') { wanted[mePath()] = { marks: me.marks, courses: me.courses, prac: me.prac, updatedAt: new Date().toISOString() }; persistCloud(mePath()); }
+  else if (mode === 'remote') { editVer++; cacheRemote(); scheduleSave(); }
+  else if (mode === 'local') saveLocal();
+}
+
+function setDay(key, map) {
+  const sid = semOf(key).id;
+  const before = new Map(levelsFor(sid).map(x => [x.c.id, x.lvl]));
+  const clean = {}; for (const k in map) if (map[k]) clean[k] = map[k];
+  const marks = { ...me.marks };
+  if (Object.keys(clean).length) marks[key] = clean; else delete marks[key];
+  me = { ...me, marks };
+  renderAll(); writeMe();
+  const worse = levelsFor(sid).filter(x => x.lvl && x.lvl !== before.get(x.c.id) && !(before.get(x.c.id) === 'r'));
+  if (worse.length) { const red = worse.find(x => x.lvl === 'r'); const w = red || worse[0]; toast(warnText(w.c, w.r), w.lvl); }
+}
+function changeCourses(sid, fn) { me = { ...me, courses: { ...me.courses, [sid]: fn(coursesFor(sid)) } }; renderAll(); writeMe(); }
+function setPracMark(key, val) {
+  const marks = { ...me.prac.marks }; if (val) marks[key] = val; else delete marks[key];
+  me = { ...me, prac: { ...me.prac, marks } }; renderAll(); writeMe();
+}
+
+/* ===================== Google sign-in ===================== */
+function decodeHint(jwt) {
+  try {
+    const b = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const p = JSON.parse(decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4)))));
+    return { given: p.given_name || '', family: p.family_name || '', emailLocal: String(p.email || '').split('@')[0] };
+  } catch (e) { return null; }
+}
+function mountGisButton() {
+  const host = document.getElementById('gbtn'); if (!host) return;
+  const g = window.google && window.google.accounts && window.google.accounts.id;
+  if (!g) { if (gisTried++ < 50) setTimeout(() => { if (needLogin) renderMain(); }, 200); return; }
+  if (!gisReady) { g.initialize({ client_id: CFG.clientId, callback: onCredential, ux_mode: 'popup', auto_select: false }); gisReady = true; }
+  host.innerHTML = '';
+  g.renderButton(host, { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', locale: 'he', width: 260 });
+}
+function onCredential(resp) {
+  if (!resp || !resp.credential) return;
+  gHint = decodeHint(resp.credential);
+  loginBusy = true; renderMain();
+  api({ action: 'login', idToken: resp.credential }).then(r => {
+    loginBusy = false;
+    if (!r.ok) { toast('הכניסה נכשלה. נסו שוב.'); renderMain(); return; }
+    let cache = null; try { cache = JSON.parse(lsGet(RC) || 'null'); } catch (e) {}
+    session = r.session; lsSet(RS, session);
+    account = { nick: r.nick || '' };
+    const keepLocal = cache && cache.pending && cache.nick && cache.nick === account.nick;
+    if (keepLocal) { me = normState(cache.state); editVer = savedVer + 1; } else { me = normState(r.state); }
+    needLogin = false; loaded = true; syncState = keepLocal ? 'saving' : 'saved';
+    cacheRemote(); renderAll(); if (keepLocal) scheduleSave(0);
+  }).catch(() => { loginBusy = false; toast('אין חיבור לשרת. בדקו את האינטרנט ונסו שוב.'); renderMain(); });
+}
+function logout() {
+  if (session) api({ action: 'logout', session }).catch(() => {});
+  session = null; account = null; gHint = null; me = emptyState(); loaded = false; editVer = savedVer = 0; syncState = 'idle';
+  lsDel(RS); lsDel(RC); lsDel(NAME_KEY); prDraft.name = null; prDraft.nick = '';
+  try { window.google.accounts.id.disableAutoSelect(); } catch (e) {}
+  needLogin = true; renderAll();
+}
+function saveProfile(f) {
+  const name = (f.elements.name.value || '').trim();
+  const nickEl = f.elements.nick; const nick = nickEl ? nickEl.value.trim().replace(/\s+/g, ' ') : null;
+  if (name.length < 2) { profileErr = 'רשמו את השם שלכם.'; renderMain(); return; }
+  if (nickEl) { const p = nickProblem(nick, name); if (p) { profileErr = p; renderMain(); return; } }
+  lsSet(NAME_KEY, name); profileErr = '';
+  if (!nickEl) { prDraft.name = null; renderAll(); return; }
+  profileBusy = true; renderMain();
+  api({ action: 'nick', session, nick }).then(r => {
+    profileBusy = false;
+    if (r.ok) { account = { nick: r.nick }; prDraft.name = null; prDraft.nick = ''; cacheRemote(); renderAll(); toast('נשמר. אפשר להתחיל.'); }
+    else if (r.error === 'nick_taken') { profileErr = 'הכינוי הזה כבר תפוס. בחרו כינוי אחר.'; renderMain(); }
+    else if (r.error === 'auth') { needLogin = true; renderAll(); }
+    else { profileErr = 'הכינוי לא נשמר. נסו כינוי אחר.'; renderMain(); }
+  }).catch(() => { profileBusy = false; profileErr = 'אין חיבור לשרת. נסו שוב.'; renderMain(); });
+}
+
+/* ===================== events ===================== */
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  const act = b.dataset.act, key = b.dataset.k;
+  if (act === 'view') { view = b.dataset.v; renderAll(); return; }
+  if (act === 'tab') { tab = b.dataset.sem; confirmDelete = null; renderAll(); return; }
+  if (act === 'toggle') { openDays.has(key) ? openDays.delete(key) : openDays.add(key); renderAll(); return; }
+  if (act === 'logout') { logout(); return; }
+  if (act === 'export') {
+    const body = JSON.stringify({ app: 'bgu-attendance-he', v: 2, savedAt: new Date().toISOString(), marks: me.marks, courses: me.courses, prac: me.prac }, null, 2);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([body], { type: 'application/json' }));
+    a.download = `bgu-attendance-backup-${iso(TODAY)}.json`;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    return;
+  }
+  if (act === 'setup-add') { draftFor(tab).push({ id: '', name: '', time: '', wd: WEEKDAY, lessons: '', allowed: '', on: true, custom: true }); renderMain(); const rows = draftFor(tab); const f = document.getElementById(`s-${tab}-${rows.length - 1}-name`); if (f) f.focus(); return; }
+  if (act === 'setup-rm') { draftFor(tab).splice(Number(b.dataset.i), 1); renderMain(); return; }
+  if (act === 'copy-a') { drafts.B = coursesFor('A').map(c => ({ ...c, wd: wdOf(c), lessons: '', allowed: Number.isFinite(c.allowed) ? String(c.allowed) : '', on: true, custom: false })); delete setupErr.B; renderMain(); return; }
+  if (act === 'del') { confirmDelete = b.dataset.c; renderAll(); return; }
+  if (act === 'del-no') { confirmDelete = null; renderAll(); return; }
+  if (act === 'del-yes') { const id = b.dataset.c; confirmDelete = null; changeCourses(tab, list => list.filter(c => c.id !== id)); toast('הקורס נמחק.'); return; }
+  if (act === 'prac-edit') { pracEditing = true; pracDraft = null; pracErr = ''; renderMain(); return; }
+  if (act === 'prac-cancel') { pracEditing = false; pracDraft = null; pracErr = ''; renderMain(); return; }
+  if (!ready()) return;
+  if (act === 'pmark') { const cur = me.prac.marks[key]; setPracMark(key, cur === b.dataset.s ? null : b.dataset.s); return; }
+  if (act === 'pextra-del') { setPracMark(key, null); return; }
+  if (act === 'ptotal-reset') { me = { ...me, prac: { ...me.prac, total: null } }; renderAll(); writeMe(); toast('סה״כ הימים מחושב שוב לפי הלוח.'); return; }
+  if (!key) return;
+  const list = coursesOn(semOf(key).id, new Date(ts(key)).getUTCDay());
+  if (act === 'all' || act === 'none') {
+    const st = act === 'all' ? 'present' : 'cancelled'; const map = {};
+    for (const c of list) map[c.id] = st;
+    openDays.delete(key + ':list'); setDay(key, map);
+  } else if (act === 'some') {
+    const cur = dayMap(key); const map = {};
+    const uniform = list.every(c => cur[c.id] === 'present') || list.every(c => cur[c.id] === 'cancelled');
+    for (const c of list) map[c.id] = uniform || !cur[c.id] ? 'present' : cur[c.id];
+    openDays.add(key + ':list'); setDay(key, map);
+  } else if (act === 'course') {
+    const cur = { ...dayMap(key) }; const s = b.dataset.s, cid = b.dataset.c;
+    cur[cid] = cur[cid] === s ? null : s;
+    openDays.add(key + ':list'); setDay(key, cur);
+  }
+});
+document.addEventListener('input', ev => {
+  const t = ev.target;
+  if (t.dataset && t.dataset.sf && t.dataset.sf !== 'on') {
+    const r = draftFor(tab)[Number(t.dataset.i)]; if (!r) return;
+    r[t.dataset.sf] = t.value;
+    if (t.dataset.sf === 'allowed' && r.bad && /^\d+$/.test(t.value)) { r.bad = false; t.classList.remove('bad'); }
+    if (t.dataset.sf === 'name' && r.badName && t.value.trim()) { r.badName = false; t.classList.remove('bad'); }
+  }
+  if (t.dataset && t.dataset.pf === 'total' && pracDraft) pracDraft.total = t.value;
+  if (t.id === 'pr-name') prDraft.name = t.value;
+  if (t.id === 'pr-nick') prDraft.nick = t.value;
+});
+document.addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.dataset && t.dataset.sf === 'on') { const r = draftFor(tab)[Number(t.dataset.i)]; if (!r) return; r.on = t.checked; renderMain(); return; }
+  if (t.dataset && t.dataset.sf === 'wd') { const r = draftFor(tab)[Number(t.dataset.i)]; if (!r) return; r.wd = Number(t.value); renderMain(); return; }
+  if (t.dataset && t.dataset.mwd) { const id = t.dataset.mwd; changeCourses(tab, list => list.map(c => c.id === id ? { ...c, wd: Number(t.value) } : c)); toast('היום עודכן.'); return; }
+  if (t.dataset && t.dataset.mles) {
+    const v = t.value.trim(); const id = t.dataset.mles;
+    if (v && (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > 40)) { toast('מספר השיעורים צריך להיות בין 1 ל-40, או ריק לחישוב לפי הלוח.'); renderMain(); return; }
+    changeCourses(tab, list => list.map(c => c.id === id ? { ...c, lessons: v ? Number(v) : null } : c)); toast('מספר השיעורים עודכן.'); return;
+  }
+  if (t.dataset && t.dataset.pf && pracDraft) {
+    const f = t.dataset.pf;
+    if (f === 'day') { const v = Number(t.dataset.v); pracDraft.days = t.checked ? [...new Set([...pracDraft.days, v])] : pracDraft.days.filter(x => x !== v); }
+    else if (f === 'start') pracDraft.start = t.value;
+    else if (f === 'end') pracDraft.end = t.value;
+    else if (f === 'winter') pracDraft.winterOnce = t.checked;
+    else if (f === 'total') pracDraft.total = t.value;
+    renderMain(); return;
+  }
+  if (t.dataset && t.dataset.mallow) {
+    const v = t.value.trim();
+    if (!/^\d+$/.test(v) || Number(v) > 20) { toast('נא להזין מספר שלם בין 0 ל-20.'); renderMain(); return; }
+    const id = t.dataset.mallow;
+    changeCourses(tab, list => list.map(c => c.id === id ? { ...c, allowed: Number(v) } : c));
+    toast('המספר עודכן.');
+  }
+});
+document.addEventListener('submit', ev => {
+  ev.preventDefault();
+  const f = ev.target;
+  if (f.id === 'profile-form') { saveProfile(f); return; }
+  if (f.id === 'prac-form') { if (ready()) savePracSetup(); return; }
+  if (f.id === 'setup-form') { if (ready()) saveSetup(f.dataset.sem); return; }
+  if (!ready()) return;
+  if (f.id === 'ptotal-form') {
+    const v = f.elements.total.value.trim();
+    if (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > 300) { toast('סה״כ ימים צריך להיות מספר בין 1 ל-300.'); return; }
+    me = { ...me, prac: { ...me.prac, total: Number(v) } }; renderAll(); writeMe(); toast('סה״כ ימי ההכשרה עודכן.'); return;
+  }
+  if (f.id === 'pextra-form') {
+    const d = f.elements.date.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { toast('בחרו תאריך.'); return; }
+    if (me.prac.marks[d] === 'done') { toast('היום הזה כבר מסומן.'); return; }
+    setPracMark(d, 'done'); toast('יום ההכשרה נוסף.'); return;
+  }
+  if (f.id === 'add-form') {
+    const name = f.elements.name.value.trim(), allowed = f.elements.allowed.value.trim(), lessons = f.elements.lessons.value.trim();
+    if (!name || !/^\d+$/.test(allowed) || Number(allowed) > 20) { toast('נא להזין שם קורס ומספר היעדרויות מותרות.'); return; }
+    if (lessons && (!/^\d+$/.test(lessons) || Number(lessons) < 1 || Number(lessons) > 40)) { toast('מספר השיעורים צריך להיות בין 1 ל-40.'); return; }
+    changeCourses(tab, list => [...list, { id: newId(), name, time: f.elements.time.value.trim(), wd: Number(f.elements.wd.value), lessons: lessons ? Number(lessons) : null, allowed: Number(allowed) }]);
+    toast('הקורס נוסף.');
+  }
+});
+document.addEventListener('keydown', ev => {
+  if (ev.target && ev.target.id === 'imp-label' && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); document.getElementById('imp-file').click(); }
+});
+document.getElementById('imp-file').addEventListener('change', ev => {
+  const f = ev.target.files && ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      if (!d || d.app !== 'bgu-attendance-he' || typeof d.marks !== 'object') throw new Error('bad');
+      me = normState(d); saveLocal(); renderAll(); toast('הנתונים נטענו מהגיבוי.');
+    } catch (e) { toast('הקובץ הזה לא נראה כמו גיבוי של המעקב הזה.'); }
+    ev.target.value = '';
+  };
+  r.readAsText(f);
+});
+
+/* ===================== start ===================== */
+function useLocal() {
+  mode = 'local';
+  try { const s = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (s && typeof s === 'object') me = normState(s); localStorage.setItem('bgu-att-probe', '1'); localStorage.removeItem('bgu-att-probe'); }
+  catch (e) { storageOk = false; }
+  loaded = true; renderAll();
+}
+function useRemote() {
+  mode = 'remote';
+  session = lsGet(RS);
+  let cache = null; try { cache = JSON.parse(lsGet(RC) || 'null'); } catch (e) {}
+  if (!session) { needLogin = true; renderAll(); return; }
+  if (cache) { account = { nick: cache.nick || '' }; me = normState(cache.state); if (cache.pending) editVer = savedVer + 1; loaded = true; }
+  renderAll();
+  api({ action: 'load', session }).then(r => {
+    if (r.ok) {
+      account = { nick: r.nick || '' };
+      if (editVer !== savedVer) scheduleSave(0); else me = normState(r.state);
+      loaded = true; syncState = editVer !== savedVer ? 'saving' : 'saved'; cacheRemote(); renderAll();
+    } else if (r.error === 'auth') { session = null; lsDel(RS); needLogin = true; renderAll(); }
+    else { syncState = 'error'; renderStatus(); }
+  }).catch(() => { syncState = 'offline'; renderAll(); });
+}
+
+document.documentElement.lang = 'he';
+document.documentElement.dir = 'rtl';
+renderAll();
+
+(async () => {
+  if (!inArtifact) return (CFG.apiUrl && CFG.clientId) ? useRemote() : useLocal();
+  try {
+    const [dbNs, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (dbNs && user) { try { uid = await user.id(); } catch (e) { uid = null; } }
+    if (!dbNs || !uid) return useLocal();
+    db = dbNs; mode = 'cloud'; renderStatus();
+    db.doc(mePath()).onSnapshot(snap => {
+      if (mode !== 'cloud') return;
+      if (!(mePath() in wanted) && !inflight[mePath()]) me = normState(snap.exists ? snap.data() : null);
+      loaded = true; renderAll();
+    }, () => toast('החיבור לשמירה נותק. רעננו את הדף.'));
+  } catch (e) { useLocal(); }
+})();
+</script>
+</body>
+</html>
