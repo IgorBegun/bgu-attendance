@@ -1,5 +1,5 @@
-/* Settings for the hosted version. Fill both values after setup; leave empty to keep data only in the browser. */
+/* Settings for the hosted version. */
 window.BGU_CONFIG = {
-  apiUrl: '',     // Apps Script web app URL, ends with /exec
-  clientId: ''    // Google OAuth client ID, ends with .apps.googleusercontent.com
+  apiUrl: 'https://script.google.com/macros/s/AKfycby6hOsvUUKEozu3w_7FxPjBiW8QUErmcrvpT1pP6MWTxbgjFEJYVkFkPf4H7dikM1200Q/exec',
+  clientId: '426266511912-774vgpc07gab7e7ht0css2ci91otgrjb.apps.googleusercontent.com'
 };
