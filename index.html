@@ -154,6 +154,8 @@ fieldset.wds-f { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-
 }
 .answers { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .card > .seg, .editor > .seg { justify-self: start; }
+.clr-row { display: flex; justify-content: flex-end; margin-top: 4px; }
+.next-row { display: flex; justify-content: flex-start; margin-top: 8px; }
 
 /* segmented mark control */
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--surface); flex: none; }
@@ -412,7 +414,7 @@ const PRAC_HOLIDAYS = { '2027-04-22':'פסח', '2027-04-28':'שביעי של פ�
 const WINTER = ['2027-01-17', '2027-02-27'];
 const PRAC_DEFAULT = { days: [0, 3], start: '2026-10-28', end: '2027-06-30', winterOnce: true };
 const HE_MONTH = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-const ST = { present: 'נכחתי', absent: 'נעדרתי', cancelled: 'בוטל', none: 'אין שיעור' };
+const ST = { present: 'נכחתי', absent: 'נעדרתי', cancelled: 'בוטל', none: 'אין שיעור השבוע' };
 
 /* ===================== helpers ===================== */
 const DAY = 86400000;
@@ -470,7 +472,7 @@ let view = 'courses', viewPicked = false;
 let tab = (SEM_DAYS.find(s => TODAY <= ts(s.end)) || SEM_DAYS[1]).id;
 const drafts = {}, setupErr = {};
 const openDays = new Set();
-let confirmDelete = null, manageOpen = false, ledgerOpen = false, wdAsk = null;
+let confirmDelete = null, manageOpen = false, ledgerOpen = false, wdAsk = null, lastDeleted = null;
 let pracDraft = null, pracErr = '', pracEditing = false, pracOpenMonths = null;
 let pendingImport = null;
 
@@ -687,9 +689,10 @@ function barHTML(lbl, val, fill, cls, mark) {
 const courseName = c => `<span class="cn"><b>${esc(c.name)}</b><small>יום ${HE_WD[wdOf(c)]}${c.time ? ` · <span class="tm" dir="ltr">${esc(c.time)}</span>` : ''}</small></span>`;
 const ready = () => loaded && !inactive && (mode === 'cloud' || mode === 'local' || (mode === 'remote' && !needLogin && !needProfile()));
 
-function segHTML(key, cid, cur, where, label, withNone) {
+function segHTML(key, cid, cur, where, label, withNone, futureOnly) {
   const dis = ready() ? '' : ' disabled';
-  return `<div class="seg${withNone ? ' four' : ''}" role="group" aria-label="${esc(label)}">` + ['present','absent','cancelled', ...(withNone ? ['none'] : [])].map(s =>
+  const opts = futureOnly ? ['cancelled', ...(withNone ? ['none'] : [])] : ['present','absent','cancelled', ...(withNone ? ['none'] : [])];
+  return `<div class="seg${withNone ? ' four' : ''}" role="group" aria-label="${esc(label)}">` + opts.map(s =>
     `<button type="button" id="seg-${where}-${key}-${esc(cid)}-${s}" data-act="course" data-k="${key}" data-c="${esc(cid)}" data-s="${s}" aria-pressed="${cur === s}"${dis}>${ST[s]}</button>`).join('') + '</div>';
 }
 
@@ -699,38 +702,59 @@ function remBadge(sid, c) {
 }
 
 let confirmAll = null;   // day key waiting for "mark all present" over a recorded absence
+let holdDay = null, pracHold = null, ptotalAsk = null;   // a past day just answered in the "today" card (courses / practicum)
+let clearAsk = null;     // day key waiting for "clear all marks of this day"
 function editorHTML(key, where) {
   const s = semOf(key); const list = coursesOnDate(key);
   if (!list.length) return `<p class="note">אין קורסים ביום הזה.</p>`;
   const map = dayMap(key); const vals = list.map(c => map[c.id]);
   const allP = vals.every(v => v === 'present'), allC = vals.every(v => v === 'cancelled'), any = vals.some(Boolean);
   const one = list.length === 1;
-  const showList = (any && !allP && !allC) || openDays.has(key + ':list');
+  const isToday = ts(key) === TODAY, future = ts(key) > TODAY;
+  const showList = future || (any && !allP && !allC) || openDays.has(key + ':list');
   const dis = ready() ? '' : ' disabled';
   const date = `${dayName(ts(key))} ${dm(ts(key))}`;
   const withNone = c => (Number(c.lessons) > 0 && c.lessons < courseLessons(s.id, c)) || map[c.id] === 'none';
-  if (confirmAll === key) return `<div class="editor"><p class="q">ביום הזה מסומנת היעדרות. לסמן ${one ? 'שנכחתם' : 'שנכחתם בכל השיעורים'} במקום?</p><div class="answers">
+  /* confirmations: the safe choice ("ביטול") always sits where the tapped button was, so a double tap cancels */
+  if (confirmAll === key) return `<div class="editor"><p class="q">ב-${dm(ts(key))} מסומנת היעדרות. לסמן ${one ? 'שנכחתם' : 'שנכחתם בכל השיעורים'} במקום?</p><div class="answers">
     <button type="button" class="btn" id="ans-${where}-${key}-allno" data-act="all-no" data-k="${key}">ביטול</button>
     <button type="button" class="btn danger" id="ans-${where}-${key}-allyes" data-act="all-yes" data-k="${key}"${dis}>כן, לסמן נכחתי</button></div></div>`;
-  let html = `<div class="editor"><span class="q">${one ? 'הייתם בשיעור?' : 'הייתם בכל השיעורים?'}</span><div class="answers">
+  if (clearAsk === key) return `<div class="editor"><p class="q">למחוק את כל הסימונים של ${esc(date)}?</p><div class="answers">
+    <button type="button" class="btn" id="ans-${where}-${key}-clrno" data-act="clr-no" data-k="${key}">ביטול</button>
+    <button type="button" class="btn danger" id="ans-${where}-${key}-clryes" data-act="day-clear" data-k="${key}"${dis}>למחוק את הסימונים</button></div></div>`;
+  const names = one ? '' : `<span class="note">הקורסים ב-${dm(ts(key))}: ${list.map(c => esc(c.name)).join(', ')}</span>`;
+  const clr = any ? `<div class="clr-row"><button type="button" class="btn small ghost" id="ans-${where}-${key}-clr" data-act="clr-ask" data-k="${key}" aria-label="ניקוי הסימונים של ${esc(date)}"${dis}>ניקוי הסימונים של היום הזה</button></div>` : '';
+  if (future) {
+    return `<div class="editor"><p class="note">${esc(date)} עוד לא הגיע. מראש אפשר לסמן רק שיעור שבוטל${list.some(withNone) ? ' או שבוע בלי שיעור' : ''}.</p><ul class="courses">` + list.map(c =>
+      `<li class="course-row ${map[c.id] || ''}"><span class="cn"><b>${esc(c.name)}</b></span>${segHTML(key, c.id, map[c.id], where, `${c.name}, ${date}`, withNone(c), true)}</li>`).join('') + `</ul>${clr}</div>`;
+  }
+  const q = one ? (isToday ? 'הייתם בשיעור?' : `הייתם בשיעור ב-${dm(ts(key))}?`) : (isToday ? 'הייתם בכל השיעורים?' : `הייתם ב-${dm(ts(key))} בכל השיעורים?`);
+  let html = `<div class="editor"><span class="q">${q}</span>${names}<div class="answers">
     <button type="button" class="btn${allP && !showList ? ' on-all' : ''}" id="ans-${where}-${key}-all" data-act="all" data-k="${key}"${dis}>${one ? 'כן' : 'כן, בכולם'}</button>
     <button type="button" class="btn${showList ? ' on-some' : ''}" id="ans-${where}-${key}-some" data-act="some" data-k="${key}"${dis}>${one ? 'לא, נעדרתי' : 'לא בכולם'}</button>
     <button type="button" class="btn${allC && !showList ? ' on-none' : ''}" id="ans-${where}-${key}-none" data-act="none" data-k="${key}"${dis}>${one ? 'השיעור בוטל' : 'כל השיעורים בוטלו'}</button>
-    ${any ? `<button type="button" class="btn small ghost" id="ans-${where}-${key}-clr" data-act="day-clear" data-k="${key}" aria-label="ניקוי הסימונים של ${esc(date)}"${dis}>ניקוי</button>` : ''}
   </div>`;
   if (showList) {
     const unmarked = vals.filter(v => !v).length;
     html += `<span class="note">${one ? 'סמנו את הקורס:' : 'סמנו כל קורס: נכחתי, נעדרתי או בוטל.'}</span><ul class="courses">` + list.map(c =>
       `<li class="course-row ${map[c.id] || ''}"><span class="cn"><b>${esc(c.name)}</b>${c.time ? `<small><span class="tm" dir="ltr">${esc(c.time)}</span></small>` : ''}${remBadge(s.id, c)}</span>${segHTML(key, c.id, map[c.id], where, `${c.name}, ${date}`, withNone(c))}</li>`).join('') + '</ul>'
       + (unmarked && unmarked < list.length ? `<div><button type="button" class="btn small" id="ans-${where}-${key}-rest" data-act="rest" data-k="${key}"${dis}>כל השאר: נכחתי</button></div>` : '')
-      + `<span class="note">"בוטל" = המרצה ביטל את השיעור, וזה לא נחשב היעדרות.${list.some(withNone) ? ' "אין שיעור" = השבוע אין שיעור לפי התכנית (למשל קורס פעם בשבועיים).' : ''}</span>`;
+      + `<span class="note">"בוטל" = המרצה ביטל את השיעור, וזה לא נחשב היעדרות.${list.some(withNone) ? ' "אין שיעור" = השבוע אין שיעור לפי הסילבוס (למשל קורס פעם בשבועיים).' : ''}</span>`;
   }
-  return html + '</div>';
+  return html + clr + '</div>';
 }
 
 /* ===================== courses: setup ===================== */
+const DRAFT_KEY = 'bgu-att-drafts';
+function saveDrafts() { lsSet(DRAFT_KEY, JSON.stringify(drafts)); }
 function draftFor(sid) {
-  if (!drafts[sid]) drafts[sid] = (DEFAULTS[sid] || []).map(c => ({ ...c, wd: WEEKDAY, lessons: '', on: true, allowed: '', custom: false }));
+  if (!drafts[sid]) {
+    let saved = null; try { saved = JSON.parse(lsGet(DRAFT_KEY) || 'null'); } catch (e) {}
+    const rows = saved && Array.isArray(saved[sid]) ? saved[sid].filter(r => r && typeof r === 'object').slice(0, 40).map(r => ({
+      id: typeof r.id === 'string' && ID_RE.test(r.id) ? r.id : '', name: strIn(r.name, 120), time: strIn(r.time, 40), wd: intIn(r.wd, 0, 5) ?? WEEKDAY,
+      lessons: strIn(String(r.lessons ?? ''), 3), allowed: strIn(String(r.allowed ?? ''), 3), on: !!r.on, custom: !!r.custom })) : null;
+    drafts[sid] = rows || (DEFAULTS[sid] || []).map(c => ({ ...c, wd: WEEKDAY, lessons: '', on: true, allowed: '', custom: false }));
+  }
   return drafts[sid];
 }
 const wdSelect = (id, attrs, cur, dis) => `<select class="field sel" id="${id}" ${attrs}${dis}>${[0,1,2,3,4,5].map(i => `<option value="${i}"${i === cur ? ' selected' : ''}>יום ${HE_WD[i]}</option>`).join('')}</select>`;
@@ -797,7 +821,7 @@ function saveSetup(sid) {
   }
   const list = on.map(r => { const l = String(r.lessons ?? '').trim(); return { id: r.id || newId(), name: String(r.name).trim(), time: String(r.time || '').trim(), wd: Number(r.wd), lessons: l ? Number(l) : null, allowed: Number(r.allowed) }; });
   me = { ...me, courses: { ...me.courses, [sid]: list } };
-  delete drafts[sid]; delete setupErr[sid];
+  delete drafts[sid]; delete setupErr[sid]; saveDrafts();
   renderAll(); writeMe(); toast('הקורסים נשמרו. אפשר להתחיל לסמן.');
   const top = document.getElementById('today-card') || document.getElementById('main');
   if (top) { top.scrollIntoView({ block: 'start' }); const h = top.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } }
@@ -842,6 +866,12 @@ function todayHTML() {
       ${editorHTML(td.key, 'today')}
       ${missed.length ? `<p class="note">${missed.length === 1 ? 'יש עוד יום לימודים אחד שלא סומן' : `יש עוד ${missed.length} ימי לימודים שלא סומנו`} ברשימה "כל ימי הלימודים" למטה.</p>` : ''}${otherSemNote()}</section>`;
   }
+  if (holdDay && semOf(holdDay) && semOf(holdDay).id === tab && ts(holdDay) < TODAY) {
+    const left = missed.filter(d => d.key !== holdDay).length; const sum = daySummary(holdDay);
+    return `<section class="card" id="today-card">${head('סימנתם יום שעבר', `${dayName(ts(holdDay))}, <span class="num">${dm(ts(holdDay))}</span>`)}
+      ${sum.text && sum.cls !== 'warn' ? `<p class="sum ${sum.cls}">${esc(sum.text)}</p>` : ''}${editorHTML(holdDay, 'today')}
+      ${left ? `<div class="next-row"><button type="button" class="btn primary" id="today-next" data-act="today-next">${left === 1 ? 'ליום הבא שלא סומן (נותר אחד)' : `ליום הבא שלא סומן (נותרו ${left})`}</button></div>` : `<p class="note">כל ימי הלימודים שעברו סומנו. <button type="button" class="btn small ghost" id="today-next" data-act="today-next">סגירה</button></p>`}${otherSemNote()}</section>`;
+  }
   if (missed.length) {
     const last = missed[missed.length - 1];
     return `<section class="card" id="today-card">${head(missed.length === 1 ? 'יום לימודים אחד לא סומן' : `${missed.length} ימי לימודים לא סומנו`, `${dayName(last.t)}, <span class="num">${dm(last.t)}</span>`)}${editorHTML(last.key, 'today')}${otherSemNote()}</section>`;
@@ -869,6 +899,7 @@ function talliesHTML() {
     return `<article class="card${lvl && !quiet ? ' lvl-' + lvl : ''}">
       <div class="cc-head"><span class="cn"><h3 class="cn-h">${esc(c.name)}</h3><small>יום ${HE_WD[wdOf(c)]}${c.hist && c.hist.length ? ` (עד <span class="num">${dm(ts(c.hist[c.hist.length - 1].until) - DAY)}</span>: יום ${HE_WD[c.hist[c.hist.length - 1].wd]})` : ''}${c.time ? ` · <span class="tm" dir="ltr">${esc(c.time)}</span>` : ''}</small></span><span class="pill ${pk}">${ptxt}</span></div>
       ${Number(c.lessons) > 0 ? `<p class="note">מספר השיעורים לפי מה שהגדרתם: ${c.lessons}</p>` : ''}
+      ${Number(c.lessons) > 0 && r.present + r.absent + r.cancelled > c.lessons ? `<p class="err">סומנו ${r.present + r.absent + r.cancelled} שיעורים, יותר מ-${c.lessons} שהגדרתם. בשבועות שאין בהם שיעור של הקורס הזה סמנו "אין שיעור השבוע".</p>` : ''}
       ${meter}
       ${(() => { const held = r.present + r.absent; const att = held ? r.present / held : null;
         const absShare = r.total ? r.absent / r.total : 0; const mark = r.total && r.allowed != null ? Math.min(100, r.allowed / r.total * 100) : null;
@@ -923,9 +954,10 @@ function manageHTML() {
           <button type="button" class="btn small ghost" id="wdask-${esc(c.id)}-no" data-act="wd-no" data-c="${esc(c.id)}">ביטול</button>
           <span class="note">"מהיום והלאה": השיעורים שכבר היו נשארים בימים שלהם. "בכל הסמסטר": הסימונים עוברים ליום החדש באותו שבוע.</span></div>` : ''}
         ${confirmDelete === c.id
-          ? `<span class="answers"><button type="button" class="btn small danger" id="del-yes-${esc(c.id)}" data-act="del-yes" data-c="${esc(c.id)}"${dis}>למחוק את הקורס</button><button type="button" class="btn small" id="del-no-${esc(c.id)}" data-act="del-no">ביטול</button></span>`
+          ? `<span class="answers"><button type="button" class="btn small" id="del-no-${esc(c.id)}" data-act="del-no">ביטול</button><button type="button" class="btn small danger" id="del-yes-${esc(c.id)}" data-act="del-yes" data-c="${esc(c.id)}"${dis}>למחוק את הקורס</button></span>`
           : `<button type="button" class="btn small ghost" id="del-${esc(c.id)}" data-act="del" data-c="${esc(c.id)}"${dis}>מחיקה</button>`}
       </li>`).join('')}</ul>` : ''}
+      ${lastDeleted && lastDeleted.sid === tab ? `<p class="note">הקורס "${esc(lastDeleted.course.name)}" נמחק. הסימונים שלו נשמרו. <button type="button" class="btn small" id="undo-del" data-act="undo-del">שחזור הקורס</button></p>` : ''}
       <form class="add" id="add-form" novalidate>
         <label class="wide">שם הקורס<input class="field" id="add-name" name="name"${dis}></label>
         <label>שעות<input class="field" id="add-time" name="time" dir="ltr" placeholder="10:00–12:00"${dis}></label>
@@ -1040,14 +1072,27 @@ function savePracSetup() {
   else if (tot && Number(tot) < pracDoneCount()) pracErr = `כבר סימנתם שהייתם בהכשרה ${nDays(pracDoneCount())}, אז הסה״כ לא יכול להיות קטן מזה.`;
   if (pracErr) { renderMain(); announce(pracErr); const e = document.querySelector('#prac-form .err'); if (e) e.scrollIntoView({ block: 'nearest' }); return; }
   const p = pracFromDraft(d);
-  if (p.total && p.total === pracSchedule(p).length) p.total = null;     // same as the calendar: keep it automatic
+  const cal = pracSchedule(p).length;
+  if (p.total && p.total === cal) p.total = null;     // same as the calendar: keep it automatic
+  if (p.total && Math.abs(p.total - cal) > cal * 0.25 && ptotalAsk !== String(p.total)) {
+    ptotalAsk = String(p.total);
+    pracErr = `לפי הלוח יוצאים ${cal} ימי הכשרה, ו-${p.total} רחוק מזה. זה מספר הימים בשנה (לא שעות ולא הימים שכבר עברו)? כדי לאשר, לחצו שוב "שמירה".`;
+    renderMain(); announce(pracErr); return;
+  }
+  ptotalAsk = null;
+  /* "לא הייתי" on days that are no longer practicum days (they were set wrong) is dropped */
+  const inSched = new Set(pracSchedule(p).map(x => x.key)); const marks = { ...p.marks }; let dropped = 0;
+  for (const k of Object.keys(marks)) if (marks[k] === 'missed' && !inSched.has(k)) { delete marks[k]; dropped++; }
+  p.marks = marks;
   me = { ...me, prac: p };
   pracDraft = null; pracEditing = false;
-  renderAll(); writeMe(); toast('הגדרות ההכשרה נשמרו.');
+  renderAll(); writeMe();
+  toast(dropped ? `הגדרות ההכשרה נשמרו. ${dropped === 1 ? 'סימון "לא הייתי" אחד' : `${dropped} סימוני "לא הייתי"`} בימים שכבר אינם ימי הכשרה נמחקו.` : 'הגדרות ההכשרה נשמרו.');
   const h = document.querySelector('#main .card h2, #main .card .label'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
 }
 /* The clear button is always there (hidden when the day is not marked), so the buttons never move under the finger. */
 function pracSegHTML(key, cur, label, where) {
+  if (ts(key) > TODAY && !cur) return `<span class="note">עוד לא הגיע</span>`;
   const dis = ready() ? '' : ' disabled';
   return `<div class="seg" role="group" aria-label="${esc(label)}">` + [['done','הייתי'],['missed','לא הייתי']].map(([s, l]) =>
 `<button type="button" id="ps-${where}-${esc(key)}-${s}" data-act="pmark" data-k="${esc(key)}" data-s="${s}" aria-pressed="${cur === s}"${dis}>${l}</button>`).join('')
@@ -1066,7 +1111,11 @@ function pracViewHTML() {
   } else {
     const un = T.sched.filter(d => d.t < TODAY && !p.marks[d.key]);
     const next = T.sched.find(d => d.t > TODAY);
-    if (un.length) { const last = un[un.length - 1]; todayCard = `<section class="card" id="today-card">${head(un.length === 1 ? 'יום הכשרה אחד לא סומן' : `${un.length} ימי הכשרה לא סומנו`, pracLabel(last.t))}<span class="q">הייתם ביום הזה בהכשרה?</span>${pracSegHTML(last.key, p.marks[last.key], pracLabel(last.t), 'pt')}</section>`; }
+    if (pracHold && ts(pracHold) < TODAY && p.marks[pracHold]) {
+      const left = un.length;
+      todayCard = `<section class="card" id="today-card">${head('סימנתם יום שעבר', pracLabel(ts(pracHold)))}<span class="q">הייתם בהכשרה ב-${dm(ts(pracHold))}?</span>${pracSegHTML(pracHold, p.marks[pracHold], pracLabel(ts(pracHold)), 'pt')}
+        ${left ? `<div class="next-row"><button type="button" class="btn primary" id="ptoday-next" data-act="ptoday-next" data-k="${pracHold}">${left === 1 ? 'ליום הבא שלא סומן (נותר אחד)' : `ליום הבא שלא סומן (נותרו ${left})`}</button></div>` : `<p class="note">כל ימי ההכשרה שעברו סומנו. <button type="button" class="btn small ghost" id="ptoday-next" data-act="ptoday-next" data-k="${pracHold}">סגירה</button></p>`}</section>`;
+    } else if (un.length) { const last = un[un.length - 1]; todayCard = `<section class="card" id="today-card">${head(un.length === 1 ? 'יום הכשרה אחד לא סומן' : `${un.length} ימי הכשרה לא סומנו`, pracLabel(last.t))}<span class="q">הייתם בהכשרה ב-${dm(last.t)}?</span>${pracSegHTML(last.key, p.marks[last.key], pracLabel(last.t), 'pt')}</section>`; }
     else if (next) { const n = Math.round((next.t - TODAY) / DAY); todayCard = `<section class="card" id="today-card">${head('יום ההכשרה הבא', pracLabel(next.t))}<p class="note">${inDays(n)}.</p></section>`; }
     else todayCard = `<section class="card" id="today-card">${head('ההכשרה', 'הסתיימה')}</section>`;
   }
@@ -1083,29 +1132,29 @@ function pracViewHTML() {
   const left = Math.max(0, T.total - T.done);
   return `${todayCard}
     <section class="card">
-      <h2 class="label">נותר להשלים</h2>
-      <div class="prac-big"><span class="n">${pctTrim(T.remaining)}</span></div>
-      <form class="row-inline" id="ptotal-form" novalidate><label class="allow">סה״כ ימי הכשרה<input class="field n" type="number" inputmode="numeric" min="1" max="300" id="pt-total" name="total" value="${T.total}"${dis}></label><button type="submit" class="btn small" id="pt-save"${dis}>עדכון</button>${p.total ? `<button type="button" class="btn small ghost" id="pt-reset" data-act="ptotal-reset"${dis}>לפי הלוח (${T.sched.length})</button>` : ''}</form>
-      <div class="meta"><span>הייתי <b>${T.done}</b> מתוך <b>${T.total}</b> ימים</span><span>${left === 1 ? 'נותר <b>יום אחד</b>' : `נותרו <b>${left}</b> ימים`}</span><span>יום אחד = <b dir="ltr">${fix2(T.per)}%</b></span>${T.missed ? `<span>ימים שלא הייתי: <b>${T.missed}</b>${T.madeUp ? ` · הושלמו: <b>${Math.min(T.madeUp, T.missed)}</b>` : ''} · נותרו להשלמה: <b>${T.toMakeUp}</b></span>` : ''}</div>
+      <h2 class="label">ההכשרה המעשית</h2>
+      <div class="prac-big"><span class="n">${pctTrim(T.remaining)}</span><span class="u">מההכשרה עוד לפניכם · השלמתם <b dir="ltr">${pctTrim(100 - T.remaining)}</b></span></div>
+      <form class="row-inline" id="ptotal-form" novalidate><label class="allow">ימי הכשרה בשנה (ימים, לא שעות)<input class="field n" type="number" inputmode="numeric" min="1" max="300" id="pt-total" name="total" value="${T.total}"${dis}></label><button type="submit" class="btn small" id="pt-save"${dis}>עדכון</button>${p.total ? `<button type="button" class="btn small ghost" id="pt-reset" data-act="ptotal-reset"${dis}>לפי הלוח (${T.sched.length})</button>` : ''}</form>
+      <div class="meta"><span>הייתי <b>${T.done}</b> מתוך <b>${T.total}</b> ימים</span><span>${left === 1 ? 'נותר <b>יום אחד</b>' : `נותרו <b>${left}</b> ימים`}</span><span>יום אחד = <b dir="ltr">${fix2(T.per)}%</b></span>${T.missed ? `<span>ימים שלא הייתי: <b>${T.missed}</b>${T.madeUp ? ` · הושלמו: <b>${Math.min(T.madeUp, T.missed)}</b>` : ''} · ימים שצריך להשלים: <b>${T.toMakeUp}</b></span>` : ''}</div>
       <p class="note">ימי ההכשרה: ${daysLabel(p.days)}${(p.changes || []).map(c => `; מ-<span class="num">${dm(ts(c.from))}</span>: ${daysLabel(c.days)}`).join('')}${p.winterOnce ? `; בחופשת הסמסטר פעם בשבוע` : ''}.</p>
       ${(() => { const dP = T.total ? T.done / T.total * 100 : 0, mP = T.total ? T.toMakeUp / T.total * 100 : 0;
         const held = T.done + T.missed;
-        return `<div class="barrow"><div class="lbl"><span>מתוך ${T.total} ימי הכשרה</span><b>הייתי <span dir="ltr">${pctTrim(dP)}</span> · להשלמה <span dir="ltr">${pctTrim(mP)}</span></b></div><div class="bar stack" role="img" aria-label="הייתי ${pctTrim(dP)}, להשלמה ${pctTrim(mP)}"><i class="acc" style="width:${clampPct(dP)}%"></i><i class="r" style="width:${clampPct(mP)}%"></i></div></div>
-          <ul class="dlegend"><li><i class="sw acc"></i>הייתי<b dir="ltr">${T.done} · ${pctTrim(dP)}</b></li><li><i class="sw r"></i>נותרו להשלמה<b dir="ltr">${T.toMakeUp} · ${pctTrim(mP)}</b></li></ul>`
+        return `<div class="barrow"><div class="lbl"><span>מתוך ${T.total} ימי הכשרה</span><b>הייתי <span dir="ltr">${pctTrim(dP)}</span> · צריך להשלים <span dir="ltr">${pctTrim(mP)}</span></b></div><div class="bar stack" role="img" aria-label="הייתי ${pctTrim(dP)}, צריך להשלים ${pctTrim(mP)}"><i class="acc" style="width:${clampPct(dP)}%"></i><i class="r" style="width:${clampPct(mP)}%"></i></div></div>
+          <ul class="dlegend"><li><i class="sw acc"></i>הייתי<b dir="ltr">${T.done} · ${pctTrim(dP)}</b></li><li><i class="sw r"></i>ימים שצריך להשלים<b dir="ltr">${T.toMakeUp} · ${pctTrim(mP)}</b></li></ul>`
           + barHTML('נוכחות בהכשרה עד עכשיו', held ? pct1(T.done / held) : '—', held ? T.done / held * 100 : 0, 'ok'); })()}
       <div class="pstrip" aria-hidden="true">${strip}</div>
       <div class="legend" aria-hidden="true"><span><i class="sq done"></i>הייתי</span><span><i class="sq missed"></i>לא הייתי</span><span><i class="sq unmarked"></i>עבר ולא סומן</span><span><i class="sq"></i>עתידי</span></div>
       ${T.unmarked ? `<p class="note">${T.unmarked === 1 ? 'יום הכשרה אחד עבר ולא סומן.' : `${T.unmarked} ימי הכשרה עברו ולא סומנו.`}</p>` : ''}
     </section>
     <section class="section" aria-labelledby="pl-h"><h2 id="pl-h">ימי ההכשרה</h2>${ledger}</section>
-    <section class="card"><h2>יום הכשרה מחוץ ללוח</h2><p class="note">אם הייתם בהכשרה ביום אחר (השלמה או יום נוסף), הוסיפו אותו כאן אחרי שהיה. יום השלמה מוריד יום מ"נותרו להשלמה".</p>
+    <section class="card"><h2>יום הכשרה מחוץ ללוח</h2><p class="note">אם הייתם בהכשרה ביום אחר (השלמה או יום נוסף), הוסיפו אותו כאן אחרי שהיה. יום השלמה מוריד יום מ"ימים שצריך להשלים".</p>
       <form class="pform" id="pextra-form" novalidate><div class="row"><label class="f">תאריך<input class="field" type="date" id="px-date" name="date" min="2026-09-01" max="${iso(TODAY) < '2027-09-30' ? iso(TODAY) : '2027-09-30'}"${dis}></label><button type="submit" class="btn" id="px-add"${dis}>הוספה</button></div></form>${extras}</section>
     <div><button type="button" class="btn" id="prac-edit" data-act="prac-edit"${dis}>שינוי הגדרות ההכשרה</button></div>`;
 }
 
 /* ===================== overall progress: study days + practicum days ===================== */
 /* A study day = a date with at least one of the student's classes (both semesters that are set up). It counts as
-   done if the student was present in at least one class, missed if every class held that day was missed, and drops
+   done once every class of the day is marked and the student was present in at least one, missed if every class held that day was missed, and drops
    out if all classes were cancelled. Practicum days come from the practicum count (total, done, still to make up). */
 function overallTally() {
   const o = { sTotal: 0, sDone: 0, sMiss: 0, sUn: 0, pTotal: 0, pDone: 0, pMiss: 0, pUn: 0, semsSet: 0 };
@@ -1119,8 +1168,9 @@ function overallTally() {
       if (vals.every(v => v === 'cancelled' || v === 'none')) continue;
       o.sTotal++;
       const held = vals.filter(v => v === 'present' || v === 'absent');
-      if (held.includes('present')) o.sDone++;
-      else if (held.length && vals.every(Boolean)) o.sMiss++;
+      const full = vals.every(Boolean);
+      if (full && held.includes('present')) o.sDone++;
+      else if (full && held.length) o.sMiss++;
       else if (d.t < TODAY) o.sUn++;
     }
   }
@@ -1137,16 +1187,17 @@ function progressHTML() {
   if (o.sTotal) parts.push(`ימי לימודים: <b>${o.sDone}</b> מתוך <b>${o.sTotal}</b>`);
   if (o.pTotal) parts.push(`ימי הכשרה: <b>${o.pDone}</b> מתוך <b>${o.pTotal}</b>`);
   const notes = [];
-  if (o.miss) notes.push(o.miss === 1 ? 'יום אחד הוחסר' : `${o.miss} ימים הוחסרו`);
+  if (o.miss) notes.push(o.miss === 1 ? 'נעדרתם יום אחד' : `נעדרתם ${o.miss} ימים`);
   if (o.un) notes.push(o.un === 1 ? 'יום אחד עבר ולא סומן' : `${o.un} ימים עברו ולא סומנו`);
   const missing = [];
   if (o.semsSet < 2) missing.push(isSetup('A') ? 'סמסטר ב׳' : 'סמסטר א׳');
   if (!me.prac) missing.push('ההכשרה המעשית');
+  const verb = missing.length > 1 ? 'ייכנסו' : missing[0] === 'ההכשרה המעשית' ? 'תיכנס' : 'ייכנס';
   return `<section class="card progress" aria-labelledby="ov-h">
     <div class="barrow"><div class="lbl"><h2 id="ov-h" class="label">התקדמות כללית בשנה: ימי לימודים וימי הכשרה</h2><b dir="ltr">${pc}</b></div>
     <div class="bar stack" role="img" aria-label="הושלמו ${o.done} מתוך ${o.total} ימים, ${pc}"><i class="ok" style="width:${w(o.done)}%"></i>${seg(o.miss, 'r')}${seg(o.un, 'u')}</div></div>
     <p class="note">${parts.join(' · ')}${notes.length ? ` · ${notes.join(' · ')}` : ''}</p>
-    ${missing.length ? `<p class="note">${missing.join(' ו')} ${missing.length > 1 ? 'ייכנסו' : 'ייכנס'} לחישוב אחרי ההגדרה.</p>` : ''}
+    ${missing.length ? `<p class="note">${missing.join(' ו')} ${verb} לחישוב אחרי ההגדרה.</p>` : ''}
   </section>`;
 }
 
@@ -1154,7 +1205,7 @@ function progressHTML() {
 let needLogin = false, loginBusy = false, gisReady = false, gisTried = 0;
 let account = null;          // { nick } from the server
 let gHint = null;            // { given, family, emailLocal } decoded locally from the Google token, never sent anywhere
-let profileErr = '', profileBusy = false, logoutAsk = false, delAsk = false, delBusy = false, acctOpen = false;
+let profileNote = '', profileErr = '', profileBusy = false, logoutAsk = false, delAsk = false, delBusy = false, acctOpen = false;
 const prDraft = { name: null, nick: '' };
 const NAME_KEY = 'bgu-att-name-v2', HINT_KEY = 'bgu-att-hint';
 /* The real name stays on this device only, tied to the nickname, so on a shared computer the next student never sees it. */
@@ -1168,13 +1219,22 @@ const PRIVACY = '<a href="privacy.html" target="_blank" rel="noopener">מדינ�
 
 /* group code: asked only from a new student, after Google sign-in; a link with ?code=… fills it in */
 const CODE_KEY = 'bgu-att-code';
+const HE_KB = { 'ק':'E','ר':'R','א':'T','ט':'Y','ו':'U','ן':'I','ם':'O','פ':'P','ש':'A','ד':'S','ג':'D','כ':'F','ע':'G','י':'H','ח':'J','ל':'K','ך':'L','ז':'Z','ס':'X','ב':'C','ה':'V','נ':'B','מ':'N','צ':'M','ת':',','ץ':'.','ף':';' };
+const RU_KB = { 'Й':'Q','Ц':'W','У':'E','К':'R','Е':'T','Н':'Y','Г':'U','Ш':'I','Щ':'O','З':'P','Ф':'A','Ы':'S','В':'D','А':'F','П':'G','Р':'H','О':'J','Л':'K','Д':'L','Я':'Z','Ч':'X','С':'C','М':'V','И':'B','Т':'N','Ь':'M' };
+const RU_LOOK = { 'А':'A','В':'B','Е':'E','К':'K','М':'M','Н':'H','О':'O','Р':'P','С':'C','Т':'T','Х':'X','У':'Y' };
+/* the code as typed, plus how it would read if typed with the keyboard in Hebrew or Russian, or with Cyrillic look-alikes */
+function codeCandidates(raw) {
+  const up = String(raw || '').toUpperCase();
+  const map = m => [...up].map(ch => m[ch] || ch).join('');
+  return [...new Set([up, map(HE_KB), map(RU_KB), map(RU_LOOK)])].slice(0, 4);
+}
 let pendingCred = null, codeErr = '';
 function codeHTML() {
   return `<form class="card pform" id="code-form" novalidate>
     <h2>קוד הקבוצה</h2>
     <p class="note">בכניסה הראשונה צריך את קוד הקבוצה שקיבלתם ממנהל האפליקציה. אחר כך כבר לא צריך אותו.</p>
-    <label class="f">קוד<input class="field" id="gc" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16" dir="ltr" value="${esc(ssGet(CODE_KEY) || '')}"></label>
-    ${codeErr ? `<p class="err">${esc(codeErr)}</p>` : ''}
+    <label class="f">קוד<input class="field" id="gc" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16" dir="ltr" value="${esc(lsGet(CODE_KEY) || '')}"></label>
+    ${codeErr ? `<p class="err">${esc(codeErr)}</p>` : ''}${loginBusy ? '<p class="note">בודקים את הקוד…</p>' : ''}
     <div class="setup-actions"><button type="submit" class="btn primary" id="gc-go"${loginBusy ? ' disabled' : ''}>המשך</button><button type="button" class="btn ghost" id="gc-back" data-act="code-back">חזרה</button></div>
   </form>`;
 }
@@ -1196,9 +1256,21 @@ function profileHTML() {
     <p class="note">השם נשמר רק במכשיר הזה ומופיע רק לכם. הוא לא נשלח לשום מקום.</p>
     ${hasNick ? `<p>הכינוי שלכם: <b>${esc(account.nick)}</b></p>` : `<label class="f">כינוי בדוי<input class="field" id="pr-nick" name="nick" maxlength="24" autocomplete="off" placeholder="למשל: ינשוף כחול" value="${esc(prDraft.nick)}"></label>
     <p class="note">הסימונים נשמרים בגיליון תחת הכינוי בלבד. בחרו כינוי שלא קשור אליכם: בלי השם, ראשי התיבות, תאריך לידה או מספר טלפון. 2–24 תווים. אחרי השמירה אי אפשר לשנות את הכינוי.</p>`}
-    ${profileErr ? `<p class="err">${esc(profileErr)}</p>` : ''}
+    ${profileErr ? `<p class="err">${esc(profileErr)}</p>` : profileNote ? `<p class="note"><b>${esc(profileNote)}</b></p>` : ''}
     <div class="setup-actions"><button type="submit" class="btn primary" id="pr-save"${profileBusy ? ' disabled' : ''}>המשך</button></div>
   </form>`;
+}
+/* consonant skeletons, so a name is recognised in Hebrew, Latin or Cyrillic letters (Michal = מיכל = Михаль) */
+const SK_HE = { 'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ','ח':'כ','ק':'כ','ט':'ת','ש':'ס','ש':'ס','ב':'ב' };
+const SK_LAT = [['sch','ס'],['sh','ס'],['ch','כ'],['kh','כ'],['tz','צ'],['ts','צ'],['th','ת'],['ph','פ'],['b','ב'],['v','ב'],['w',''],['g','ג'],['j','ג'],['d','ד'],['z','ז'],['h',''],['t','ת'],['k','כ'],['c','כ'],['q','כ'],['x','כס'],['l','ל'],['m','מ'],['n','נ'],['s','ס'],['p','פ'],['f','פ'],['r','ר'],['y',''],['a',''],['e',''],['i',''],['o',''],['u','']];
+const SK_CYR = { 'б':'ב','в':'ב','г':'ג','д':'ד','ж':'ז','з':'ז','к':'כ','л':'ל','м':'מ','н':'נ','п':'פ','р':'ר','с':'ס','т':'ת','ф':'פ','х':'כ','ц':'צ','ч':'צ','ш':'ס','щ':'ס' };
+function skeletons(w) {
+  w = String(w).toLowerCase();
+  if (/[\u0590-\u05ff]/.test(w)) { const k = [...w].map(ch => /[אהויע]/.test(ch) ? '' : (SK_HE[ch] || ch)).join(''); return [k]; }
+  if (/[а-яё]/.test(w)) return [[...w].map(ch => SK_CYR[ch] ?? '').join('')];
+  let out = '', i = 0;
+  while (i < w.length) { const m = SK_LAT.find(([l]) => w.startsWith(l, i)); if (m) { out += m[1]; i += m[0].length; } else i++; }
+  return [out, out.replace(/ב/g, '')];    // v / w can be ו in Hebrew (דוד = David)
 }
 function nickProblem(nick, name) {
   if (!/^[\p{L}\p{N} _\-]{2,24}$/u.test(nick)) return 'הכינוי צריך להכיל 2–24 אותיות, ספרות, רווח, מקף או קו תחתון.';
@@ -1216,6 +1288,9 @@ function nickProblem(nick, name) {
   const initials = nameWords.filter(w => w.length >= 2).map(w => w.map(x => x[0]).join(''));
   if (parts.some(x => x.length >= 3 ? flat.includes(x) : words.includes(x)) || initials.some(i => flat === i || letters === i || words.includes(i) || words.join('') === i))
     return 'הכינוי דומה לשם שלכם, לראשי התיבות או לכתובת המייל. בחרו כינוי שלא מזהה אתכם.';
+  const nameSk = new Set(parts.filter(x => x.length >= 3).flatMap(skeletons).filter(k => k.length >= 2));
+  if (words.some(w => skeletons(w).some(k => k.length >= 2 && nameSk.has(k))))
+    return 'הכינוי דומה לשם שלכם (גם בכתב אחר). בחרו כינוי שלא מזהה אתכם.';
   return '';
 }
 function accountHTML() {
@@ -1450,7 +1525,8 @@ function pull() {
     } else if (r.error === 'auth') { session = null; lsDel(RS); needLogin = true; renderAll(); }
   }).catch(() => {});
 }
-setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 60000);
+setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 30000);
+window.addEventListener('focus', () => pull());
 /* Leaving the page (closing the tab, switching app): send what is not saved yet, without waiting for the answer. */
 function flushOnLeave() { if (mode === 'remote' && editVer !== savedVer && !saving) doSave(true); }
 window.addEventListener('pagehide', flushOnLeave);
@@ -1531,31 +1607,38 @@ function changeCourses(sid, fn, quiet) {
 /* Moving a course to another weekday moves its marks to the new day of the same week, so they keep counting. */
 /* how = 'now': from today on (past lessons keep their day); 'all': the whole semester (a setup mistake) */
 function applyWeekday(c, wd, how, sel) {
-  const today = iso(TODAY);
+  /* "from today on": if the course already had its lesson this week (marked), the new day starts next week,
+     so one week never counts two lessons */
+  const weekStart = TODAY - new Date(TODAY).getUTCDay() * DAY;
+  let from = iso(TODAY);
+  for (let t = weekStart; t <= TODAY; t += DAY) if (dayMap(iso(t))[c.id]) { from = iso(weekStart + 7 * DAY); break; }
   const next = how === 'now'
-    ? { ...c, wd, hist: [...(c.hist || []).filter(h => h.until < today), { until: today, wd: wdAt(c, today) }] }
+    ? { ...c, wd, hist: [...(c.hist || []).filter(h => h.until < from), { until: from, wd: wdAt(c, iso(TODAY)) }] }
     : (() => { const x = { ...c, wd }; delete x.hist; return x; })();
   const lessons = next.lessons || courseLessons(tab, next);
   if (Number.isFinite(c.allowed) && c.allowed > lessons) {
     wdAsk = null; if (sel) sel.value = wdOf(c); renderMain();
     toast(`ביום ${HE_WD[wd]} יש רק ${nLessons(lessons)}, פחות ממספר ההיעדרויות המותרות. שנו קודם את ההיעדרויות המותרות.`); return;
   }
-  const moved = how === 'all' ? moveCourseDay(tab, c.id, wd) : 0;
+  const mv = how === 'all' ? moveCourseDay(tab, c.id, wd) : { moved: 0, kept: 0 };
   wdAsk = null;
   changeCourses(tab, list => list.map(x => x.id === c.id ? next : x), !!sel);
   const h = document.getElementById(`m-${c.id}-hint`); if (h) h.textContent = `ריק = ${courseLessons(tab, next)} לפי הלוח`;
-  toast(how === 'now' ? `מהיום הקורס ביום ${HE_WD[wd]}. השיעורים שכבר היו נשארו כמו שהם.`
-    : moved ? `יום הקורס עודכן. ${moved === 1 ? 'סימון אחד הועבר' : `${moved} סימונים הועברו`} ליום ${HE_WD[wd]} באותו שבוע.` : 'יום הקורס עודכן.');
+  if (how === 'now') toast(from === iso(TODAY) ? `מהיום הקורס ביום ${HE_WD[wd]}. השיעורים שכבר היו נשארו כמו שהם.` : `השבוע כבר סומן שיעור, אז מהשבוע הבא הקורס ביום ${HE_WD[wd]}.`);
+  else toast(['יום הקורס עודכן.', mv.moved ? `${mv.moved === 1 ? 'סימון אחד הועבר' : `${mv.moved} סימונים הועברו`} ליום ${HE_WD[wd]} באותו שבוע.` : '',
+    mv.kept ? `${mv.kept === 1 ? 'סימון אחד נשאר' : `${mv.kept} סימונים נשארו`} בתאריך שלו, כי יום ${HE_WD[wd]} באותו שבוע עוד לא הגיע (השיעור של השבוע לא ייספר פעמיים).` : ''].filter(Boolean).join(' '));
 }
 function moveCourseDay(sid, id, newWd) {
   const c = coursesFor(sid).find(x => x.id === id); if (!c) return 0;
   const oldWd = wdOf(c); if (oldWd === newWd) return 0;
-  const sem = semById(sid); const marks = { ...me.marks }; let moved = 0;
+  const sem = semById(sid); const marks = { ...me.marks }; let moved = 0, kept = 0;
   for (const d of sem.all) {
     if (d.wd !== oldWd || !marks[d.key] || !marks[d.key][id]) continue;
     const tKey = iso(d.t + (newWd - oldWd) * DAY);
     const target = sem.all.find(x => x.key === tKey);
-    if (!target || target.brk || target.t > TODAY || (marks[tKey] && marks[tKey][id])) continue;   // never into the future
+    if (!target || target.brk || (marks[tKey] && marks[tKey][id])) continue;
+    /* never into the future: the mark stays where it is, and that week's new day is marked "no class" */
+    if (target.t > TODAY) { marks[tKey] = { ...(marks[tKey] || {}), [id]: 'none' }; kept++; continue; }
     const st = marks[d.key][id];
     const from = { ...marks[d.key] }; delete from[id];
     if (Object.keys(from).length) marks[d.key] = from; else delete marks[d.key];
@@ -1563,7 +1646,7 @@ function moveCourseDay(sid, id, newWd) {
     moved++;
   }
   me = { ...me, marks };
-  return moved;
+  return { moved, kept };
 }
 function setPracMark(key, val) {
   const marks = { ...me.prac.marks }; if (val) marks[key] = val; else delete marks[key];
@@ -1589,12 +1672,12 @@ function mountGisButton() {
 function onCredential(resp) {
   if (!resp || !resp.credential) return;
   gHint = decodeHint(resp.credential); ssSet(HINT_KEY, JSON.stringify(gHint));
-  doLogin(resp.credential, ssGet(CODE_KEY) || '');
+  doLogin(resp.credential, lsGet(CODE_KEY) || '');
 }
 function doLogin(cred, code) {
   loginBusy = true; renderMain();
   const g = ++gen;
-  api({ action: 'login', idToken: cred, code }).then(r => {
+  api({ action: 'login', idToken: cred, code: code ? codeCandidates(code) : '' }).then(r => {
     if (g !== gen) return;
     loginBusy = false;
     if (!r.ok && r.error === 'code') {
@@ -1604,7 +1687,7 @@ function doLogin(cred, code) {
     }
     if (!r.ok && r.error === 'auth' && pendingCred) { pendingCred = null; codeErr = ''; toast('הכניסה עם Google פגה. היכנסו שוב.'); renderMain(); return; }
     if (!r.ok) { toast(r.error === 'busy' ? 'השרת עמוס כרגע. נסו שוב בעוד דקה.' : 'הכניסה נכשלה. נסו שוב.'); renderMain(); return; }
-    pendingCred = null; codeErr = ''; ssDel(CODE_KEY);
+    pendingCred = null; codeErr = ''; lsDel(CODE_KEY);
     clearTimeout(saveTimer); saving = false; retryN = 0;
     session = r.session; lsSet(RS, session);
     account = { nick: r.nick || '' };
@@ -1631,7 +1714,7 @@ function logout(force) {
   logoutAsk = false; gen++; clearTimeout(saveTimer); clearTimeout(loadTimer); saving = false;
   if (session) endSession(session);
   session = null; account = null; gHint = null; me = emptyState(); base = null; rev = 0; loaded = false; brokenData = false; inDoubt = []; editVer = savedVer = 0; syncState = 'idle';
-  lsDel(RS); lsDel(RC); lsDel(NAME_KEY); ssDel(HINT_KEY); prDraft.name = null; prDraft.nick = ''; delAsk = false; delBusy = false; viewPicked = false;
+  lsDel(RS); lsDel(RC); lsDel(NAME_KEY); lsDel(DRAFT_KEY); for (const k in drafts) delete drafts[k]; ssDel(HINT_KEY); prDraft.name = null; prDraft.nick = ''; delAsk = false; delBusy = false; viewPicked = false;
   try { window.google.accounts.id.disableAutoSelect(); } catch (e) {}
   needLogin = true; renderAll();
 }
@@ -1653,12 +1736,13 @@ function saveProfile(f) {
   const fail = (msg, id) => { profileErr = msg; profileBusy = false; renderMain(); focusId(id); announce(msg); };
   if (name.length < 2) return fail('רשמו את השם שלכם.', 'pr-name');
   if (nickEl) { const p = nickProblem(nick, name); if (p) return fail(p, 'pr-nick'); }
+  if (nickEl && prDraft.confirmed !== nick) { prDraft.confirmed = nick; profileErr = ''; profileNote = `הכינוי שלכם יהיה: "${nick}". אחרי השמירה אי אפשר לשנות אותו. אם זה בסדר, לחצו שוב "המשך".`; renderMain(); focusId('pr-save'); announce(profileNote); return; }
   profileErr = '';
   if (!nickEl) { saveName(name); prDraft.name = null; renderAll(); toast('נשמר.'); return; }
   profileBusy = true; renderMain();
   api({ action: 'nick', session, nick }).then(r => {
     profileBusy = false;
-    if (r.ok) { account = { nick: r.nick }; saveName(name); ssDel(HINT_KEY); gHint = null; prDraft.name = null; prDraft.nick = ''; cacheRemote(); renderAll(); toast('נשמר. אפשר להתחיל.'); if (editVer !== savedVer) scheduleSave(0); }
+    if (r.ok) { profileNote = ''; prDraft.confirmed = null; account = { nick: r.nick }; saveName(name); ssDel(HINT_KEY); gHint = null; prDraft.name = null; prDraft.nick = ''; cacheRemote(); renderAll(); toast('נשמר. אפשר להתחיל.'); if (editVer !== savedVer) scheduleSave(0); }
     else if (r.error === 'nick_taken') fail('הכינוי הזה כבר תפוס. בחרו כינוי אחר.', 'pr-nick');
     else if (r.error === 'nick_set') { loadRemote(); }
     else if (r.error === 'busy') fail('השרת עמוס כרגע. נסו שוב בעוד דקה.', 'pr-save');
@@ -1678,8 +1762,8 @@ document.addEventListener('click', ev => {
 });
 function onAct(b) {
   const act = b.dataset.act, key = b.dataset.k;
-  if (act === 'view') { if (view !== b.dataset.v) hideToast(); view = b.dataset.v; viewPicked = true; renderAll(); return; }
-  if (act === 'tab') { tab = b.dataset.sem; confirmDelete = null; renderAll(); if (b.id.startsWith('go-')) focusId('tab-' + tab); return; }
+  if (act === 'view') { if (view !== b.dataset.v) hideToast(); view = b.dataset.v; viewPicked = true; holdDay = pracHold = null; renderAll(); return; }
+  if (act === 'tab') { tab = b.dataset.sem; confirmDelete = null; holdDay = null; renderAll(); if (b.id.startsWith('go-')) focusId('tab-' + tab); return; }
   if (act === 'toggle') { openDays.has(key) ? openDays.delete(key) : openDays.add(key); renderMain(); return; }
   if (act === 'code-back') { pendingCred = null; codeErr = ''; renderMain(); return; }
   if (act === 'use-here') { claimTab(); renderAll(); lastPull = 0; if (mode === 'remote') setTimeout(pull, 300); return; }
@@ -1698,16 +1782,21 @@ function onAct(b) {
   }
   if (act === 'imp-no') { pendingImport = null; renderStatus(); focusId('imp-label'); return; }
   if (act === 'imp-yes') { if (pendingImport) { me = pendingImport.state; pendingImport = null; saveLocal(); renderAll(); toast('הנתונים נטענו מהגיבוי.'); focusId('imp-label'); } return; }
-  if (act === 'setup-add') { draftFor(tab).push({ id: '', name: '', time: '', wd: WEEKDAY, lessons: '', allowed: '', on: true, custom: true }); renderMain(); focusId(`s-${tab}-${draftFor(tab).length - 1}-name`); return; }
-  if (act === 'setup-rm') { draftFor(tab).splice(Number(b.dataset.i), 1); renderMain(); focusId('setup-add'); return; }
-  if (act === 'copy-a') { drafts.B = coursesFor('A').map(c => ({ ...c, wd: wdOf(c), lessons: '', allowed: Number.isFinite(c.allowed) ? String(c.allowed) : '', on: true, custom: true })); delete setupErr.B; renderMain(); return; }
+  if (act === 'setup-add') { setTimeout(saveDrafts); draftFor(tab).push({ id: '', name: '', time: '', wd: WEEKDAY, lessons: '', allowed: '', on: true, custom: true }); renderMain(); focusId(`s-${tab}-${draftFor(tab).length - 1}-name`); return; }
+  if (act === 'setup-rm') { draftFor(tab).splice(Number(b.dataset.i), 1); saveDrafts(); renderMain(); focusId('setup-add'); return; }
+  if (act === 'copy-a') { drafts.B = coursesFor('A').map(c => ({ ...c, wd: wdOf(c), lessons: '', allowed: Number.isFinite(c.allowed) ? String(c.allowed) : '', on: true, custom: true })); delete setupErr.B; saveDrafts(); renderMain(); return; }
   if (act === 'wd-no') { const id = b.dataset.c; wdAsk = null; renderMain(); focusId(`m-${id}-wd`); return; }
   if (act === 'wd-now' || act === 'wd-all') { const c = coursesFor(tab).find(x => x.id === b.dataset.c); if (c && wdAsk) { const wd = wdAsk.wd; applyWeekday(c, wd, act === 'wd-now' ? 'now' : 'all', null); focusId(`m-${c.id}-wd`); } return; }
   if (act === 'del') { confirmDelete = b.dataset.c; renderMain(); focusId(`del-no-${b.dataset.c}`); return; }
   if (act === 'del-no') { const id = confirmDelete; confirmDelete = null; renderMain(); focusId(`del-${id}`); return; }
+  if (act === 'undo-del') {
+    if (lastDeleted && lastDeleted.sid === tab) { const { course, index } = lastDeleted; lastDeleted = null; changeCourses(tab, list => { const l = list.filter(c => c.id !== course.id); l.splice(Math.min(index, l.length), 0, course); return l; }); toast('הקורס שוחזר עם הסימונים שלו.'); }
+    return;
+  }
   if (act === 'del-yes') {
     const id = b.dataset.c; confirmDelete = null;
-    changeCourses(tab, list => list.filter(c => c.id !== id)); toast('הקורס נמחק.');
+    const idx = coursesFor(tab).findIndex(c => c.id === id); if (idx >= 0) lastDeleted = { sid: tab, course: coursesFor(tab)[idx], index: idx };
+    changeCourses(tab, list => list.filter(c => c.id !== id)); toast('הקורס נמחק. אפשר לשחזר אותו בחלק "עריכת הקורסים".');
     const s = document.querySelector('details.manage summary'); if (s) s.focus({ preventScroll: true });
     return;
   }
@@ -1718,18 +1807,38 @@ function onAct(b) {
   if (act === 'delme-yes') { deleteMe(); return; }
   if (!ready()) return;
   /* tapping a mark that is already chosen does nothing, so a double tap can't erase it */
-  if (act === 'pmark') { if (me.prac.marks[key] === b.dataset.s) return; setPracMark(key, b.dataset.s); return; }
+  if (act === 'pmark') {
+    if (me.prac.marks[key] === b.dataset.s || ts(key) > TODAY) return;
+    if (b.closest('#today-card') && ts(key) < TODAY) pracHold = key;
+    setPracMark(key, b.dataset.s); return;
+  }
   if (act === 'pclear') { setPracMark(key, null); focusId(b.id.replace(/-clr$/, '-done')); return; }
   if (act === 'pextra-del') { setPracMark(key, null); focusId('px-date'); return; }
   if (act === 'ptotal-reset') { me = { ...me, prac: { ...me.prac, total: null } }; renderAll(); writeMe(); toast('סה״כ הימים מחושב שוב לפי הלוח.'); focusId('pt-total'); return; }
+  if (act === 'today-next') { holdDay = null; renderMain(); const f = document.querySelector('#today-card .answers button'); if (f) f.focus({ preventScroll: true }); return; }
+  if (act === 'ptoday-next') { pracHold = null; renderMain(); const f = document.querySelector('#today-card .seg button'); if (f) f.focus({ preventScroll: true }); return; }
   if (!key || !semOf(key)) return;
   const list = coursesOnDate(key);
+  const future = ts(key) > TODAY;
+  if (future && (act === 'all' || act === 'all-yes' || act === 'some' || act === 'rest' || (act === 'course' && (b.dataset.s === 'present' || b.dataset.s === 'absent')))) return;
+  /* a past day answered in the "today" card stays on screen until "ליום הבא" (so a second tap never marks another day) */
+  if (b.closest('#today-card') && ts(key) < TODAY) holdDay = key;
+  if (act === 'clr-ask') { clearAsk = key; renderMain(); focusId(b.id.replace(/-clr$/, '-clrno')); return; }
+  if (act === 'clr-no') { clearAsk = null; renderMain(); focusId(b.id.replace(/-clrno$/, '-all')); return; }
   if (act === 'all-no') { confirmAll = null; renderMain(); focusId(b.id.replace(/-allno$/, '-all')); return; }
   if (act === 'all' && list.some(c => dayMap(key)[c.id] === 'absent')) { confirmAll = key; renderMain(); focusId(b.id.replace(/-all$/, '-allno')); return; }
   if (act === 'all' || act === 'all-yes' || act === 'none') {
-    const st = act === 'none' ? 'cancelled' : 'present'; const map = {};
-    for (const c of list) map[c.id] = st;
-    confirmAll = null; openDays.delete(key + ':list'); setDay(key, map);
+    const st = act === 'none' ? 'cancelled' : 'present'; const map = { ...dayMap(key) };
+    /* a course with fewer lessons than weeks (e.g. every other week) is never filled in by "כן, בכולם":
+       the student marks it on its own (נכחתי / אין שיעור השבוע), so weeks without a class are not counted as lessons */
+    const sid = semOf(key).id;
+    const skip = list.length > 1 ? list.filter(c => Number(c.lessons) > 0 && c.lessons < courseLessons(sid, c)) : [];
+    for (const c of list) if (!skip.includes(c)) map[c.id] = st;
+    confirmAll = null;
+    if (skip.length && skip.some(c => !map[c.id])) {
+      openDays.add(key + ':list'); setDay(key, map);
+      toast(`${skip.map(c => c.name).join(', ')}: ${skip.length === 1 ? 'בקורס הזה' : 'בקורסים האלה'} פחות שיעורים משבועות. סמנו ${skip.length === 1 ? 'אותו' : 'אותם'} בנפרד: נכחתי או "אין שיעור השבוע".`, 'y');
+    } else { openDays.delete(key + ':list'); setDay(key, map); }
     if (act === 'all-yes') focusId(b.id.replace(/-allyes$/, '-all'));
   } else if (act === 'some') {
     if (list.length === 1) { openDays.add(key + ':list'); setDay(key, { [list[0].id]: 'absent' }); return; }
@@ -1738,7 +1847,7 @@ function onAct(b) {
     const map = { ...dayMap(key) }; for (const c of list) if (!map[c.id]) map[c.id] = 'present';
     setDay(key, map); focusId(b.id.replace(/-rest$/, '-some'));
   } else if (act === 'day-clear') {
-    openDays.delete(key + ':list'); setDay(key, {}); focusId(b.id.replace(/-clr$/, '-all'));
+    clearAsk = null; openDays.delete(key + ':list'); setDay(key, {}); focusId(b.id.replace(/-clryes$/, '-all')); toast(`הסימונים של ${dm(ts(key))} נמחקו.`);
   } else if (act === 'course') {
     const cur = { ...dayMap(key) }; const s = b.dataset.s, cid = b.dataset.c;
     if (cur[cid] === s) return;
@@ -1760,10 +1869,11 @@ document.addEventListener('input', ev => {
     r[t.dataset.sf] = t.value;
     if (t.dataset.sf === 'allowed' && r.bad && /^\d+$/.test(t.value)) { r.bad = false; t.classList.remove('bad'); t.removeAttribute('aria-invalid'); }
     if (t.dataset.sf === 'name' && r.badName && t.value.trim()) { r.badName = false; t.classList.remove('bad'); t.removeAttribute('aria-invalid'); }
+    saveDrafts();
   }
   if (t.dataset && t.dataset.pf && pracDraft) updatePracDraft(t);
   if (t.id === 'pr-name') prDraft.name = t.value;
-  if (t.id === 'pr-nick') prDraft.nick = t.value;
+  if (t.id === 'pr-nick') { prDraft.nick = t.value; prDraft.confirmed = null; if (profileNote) { profileNote = ''; } }
 });
 /* the practicum form recalculates in place, without redrawing (no lost cursor, no lost click on "שמירה") */
 function updatePracDraft(t) {
@@ -1790,6 +1900,7 @@ document.addEventListener('change', ev => {
       r.wd = Number(t.value);
       const h = document.getElementById(`s-${tab}-${i}-hint`); if (h) h.textContent = `ריק = ${lessonsOnWd(tab, r.wd)} לפי הלוח`;
     }
+    saveDrafts();
     return;
   }
   if (t.dataset.pf && pracDraft) { updatePracDraft(t); return; }
@@ -1832,7 +1943,7 @@ document.addEventListener('submit', ev => {
   if (f.id === 'code-form') {
     const code = f.elements.code.value.trim();
     if (!code) { codeErr = 'רשמו את קוד הקבוצה.'; renderMain(); focusId('gc'); announce(codeErr); return; }
-    if (pendingCred && !loginBusy) { ssSet(CODE_KEY, code); doLogin(pendingCred, code); }
+    if (pendingCred && !loginBusy) { lsSet(CODE_KEY, code); doLogin(pendingCred, code); }
     return;
   }
   if (f.id === 'prac-form') { if (ready()) savePracSetup(); return; }
@@ -1842,7 +1953,11 @@ document.addEventListener('submit', ev => {
     const v = f.elements.total.value.trim();
     if (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > 300) { toast('סה״כ ימים צריך להיות מספר בין 1 ל-300.'); focusId('pt-total'); return; }
     if (Number(v) < pracDoneCount()) { toast(`כבר סימנתם שהייתם בהכשרה ${nDays(pracDoneCount())}, אז הסה״כ לא יכול להיות קטן מזה.`); focusId('pt-total'); return; }
-    me = { ...me, prac: { ...me.prac, total: Number(v) === pracSchedule(me.prac).length ? null : Number(v) } }; renderAll(); writeMe(); toast('סה״כ ימי ההכשרה עודכן.'); return;
+    const cal = pracSchedule(me.prac).length;
+    /* far from the calendar (for example hours instead of days, or the days already done): ask once more */
+    if (Math.abs(Number(v) - cal) > cal * 0.25 && ptotalAsk !== v) { ptotalAsk = v; toast(`לפי הלוח יש ${cal} ימי הכשרה, ו-${v} רחוק מזה. זה מספר הימים בשנה (לא שעות)? כדי לאשר, לחצו שוב "עדכון".`, 'y'); focusId('pt-save'); return; }
+    ptotalAsk = null;
+    me = { ...me, prac: { ...me.prac, total: Number(v) === cal ? null : Number(v) } }; renderAll(); writeMe(); toast('מספר ימי ההכשרה עודכן.'); return;
   }
   if (f.id === 'pextra-form') {
     const d = f.elements.date.value;
@@ -1909,7 +2024,7 @@ function useRemote() {
   mode = 'remote';
   try {
     const u = new URL(location.href); const c = u.searchParams.get('code');
-    if (c) { ssSet(CODE_KEY, c.slice(0, 16)); u.searchParams.delete('code'); history.replaceState(null, '', u.pathname + (u.search || '') + u.hash); }
+    if (c) { lsSet(CODE_KEY, c.slice(0, 16)); u.searchParams.delete('code'); history.replaceState(null, '', u.pathname + (u.search || '') + u.hash); }
   } catch (e) {}
   lsDel('bgu-att-cache-v1'); lsDel('bgu-att-name');
   const out = lsGet(RL); if (out && out !== lsGet(RS)) endSession(out); else if (out) lsDel(RL);
@@ -1949,6 +2064,8 @@ function loadRemote() {
 
 document.documentElement.lang = 'he';
 document.documentElement.dir = 'rtl';
+/* offline copy of the page (hosted version only) */
+if (!inArtifact && CFG.apiUrl && 'serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
 renderAll();
 
 (async () => {
