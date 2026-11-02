@@ -156,6 +156,16 @@ fieldset.wds-f { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-
 .card > .seg, .editor > .seg { justify-self: start; }
 .clr-row { display: flex; justify-content: flex-end; margin-top: 4px; }
 .next-row { display: flex; justify-content: flex-start; margin-top: 8px; }
+/* choosing another day in the top card */
+.picker { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.pick-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pick-row > .note { flex-basis: 100%; }
+.btn.chip { min-width: 64px; }
+.btn.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.pick-sel { display: grid; gap: 4px; font-size: 0.86rem; color: var(--muted); }
+.pick-sel select.field.sel { width: 100%; max-width: 100%; font-size: 16px; color: var(--fg); }
+.sq.go { cursor: pointer; }
+@media (hover: hover) { .sq.go:hover { outline: 2px solid var(--accent); outline-offset: 1px; } }
 
 /* segmented mark control */
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--surface); flex: none; }
@@ -857,6 +867,19 @@ function todayHTML() {
   if (TODAY < ts(sem.start)) { const f = sd.find(d => !d.brk); return `<section class="card" id="today-card">${head(sem.name, `מתחיל ב-<span class="num">${sem.startText}</span>`)}${f ? `<p class="note">השיעור הראשון: ${dayName(f.t)}, <span class="num">${dm(f.t)}</span>.</p>` : ''}${otherSemNote()}</section>`; }
   const missed = unmarkedPast(tab);
   const td = inSem ? sd.find(d => d.t === TODAY && !d.brk) : null;
+  /* a past day chosen in the card (a date button, the date list or a square in a course card), or just answered there:
+     it stays on screen until "ליום הבא" / "היום", so a second tap never marks another day */
+  const held = holdDay && semOf(holdDay) && semOf(holdDay).id === tab && ts(holdDay) < TODAY && coursesOnDate(holdDay).length ? holdDay : null;
+  if (held) {
+    const left = missed.filter(d => d.key !== held).length; const sum = daySummary(held);
+    const title = sum.cls !== 'warn' ? 'סימנתם יום שעבר' : missed.length === 1 ? 'יום לימודים אחד לא סומן' : `${missed.length} ימי לימודים לא סומנו`;
+    return `<section class="card" id="today-card">${head(title, `${dayName(ts(held))}, <span class="num">${dm(ts(held))}</span>`)}
+      ${NOTES[held] ? `<p class="note">${esc(NOTES[held])}.</p>` : ''}
+      ${sum.text && sum.cls !== 'warn' ? `<p class="sum ${sum.cls}">${esc(sum.text)}</p>` : ''}${editorHTML(held, 'today')}
+      ${left ? `<div class="next-row"><button type="button" class="btn primary" id="today-next" data-act="today-next">${left === 1 ? 'ליום הבא שלא סומן (נותר אחד)' : `ליום הבא שלא סומן (נותרו ${left})`}</button></div>`
+        : `<p class="note">כל ימי הלימודים שעברו סומנו. <button type="button" class="btn small ghost" id="today-next" data-act="today-next">${td ? 'חזרה להיום' : 'סגירה'}</button></p>`}
+      ${dayPickHTML(held)}${otherSemNote()}</section>`;
+  }
   if (td) {
     const sum = daySummary(td.key);
     const listOpen = openDays.has(td.key + ':list');
@@ -864,22 +887,56 @@ function todayHTML() {
       ${NOTES[td.key] ? `<p class="note">${esc(NOTES[td.key])}.</p>` : ''}
       ${sum.text && sum.cls !== 'warn' && !listOpen ? `<p class="sum ${sum.cls}">${esc(sum.text)}</p>` : ''}
       ${editorHTML(td.key, 'today')}
-      ${missed.length ? `<p class="note">${missed.length === 1 ? 'יש עוד יום לימודים אחד שלא סומן' : `יש עוד ${missed.length} ימי לימודים שלא סומנו`} ברשימה "כל ימי הלימודים" למטה.</p>` : ''}${otherSemNote()}</section>`;
-  }
-  if (holdDay && semOf(holdDay) && semOf(holdDay).id === tab && ts(holdDay) < TODAY) {
-    const left = missed.filter(d => d.key !== holdDay).length; const sum = daySummary(holdDay);
-    return `<section class="card" id="today-card">${head('סימנתם יום שעבר', `${dayName(ts(holdDay))}, <span class="num">${dm(ts(holdDay))}</span>`)}
-      ${sum.text && sum.cls !== 'warn' ? `<p class="sum ${sum.cls}">${esc(sum.text)}</p>` : ''}${editorHTML(holdDay, 'today')}
-      ${left ? `<div class="next-row"><button type="button" class="btn primary" id="today-next" data-act="today-next">${left === 1 ? 'ליום הבא שלא סומן (נותר אחד)' : `ליום הבא שלא סומן (נותרו ${left})`}</button></div>` : `<p class="note">כל ימי הלימודים שעברו סומנו. <button type="button" class="btn small ghost" id="today-next" data-act="today-next">סגירה</button></p>`}${otherSemNote()}</section>`;
+      ${dayPickHTML(td.key)}${otherSemNote()}</section>`;
   }
   if (missed.length) {
     const last = missed[missed.length - 1];
-    return `<section class="card" id="today-card">${head(missed.length === 1 ? 'יום לימודים אחד לא סומן' : `${missed.length} ימי לימודים לא סומנו`, `${dayName(last.t)}, <span class="num">${dm(last.t)}</span>`)}${editorHTML(last.key, 'today')}${otherSemNote()}</section>`;
+    return `<section class="card" id="today-card">${head(missed.length === 1 ? 'יום לימודים אחד לא סומן' : `${missed.length} ימי לימודים לא סומנו`, `${dayName(last.t)}, <span class="num">${dm(last.t)}</span>`)}${editorHTML(last.key, 'today')}${dayPickHTML(last.key)}${otherSemNote()}</section>`;
   }
   const next = sd.find(d => d.t > TODAY && !d.brk);
-  if (!next) return `<section class="card" id="today-card">${head(sem.name, 'הסמסטר הסתיים')}<p class="note">כל ימי הלימודים סומנו.</p>${otherSemNote()}</section>`;
+  if (!next) return `<section class="card" id="today-card">${head(sem.name, 'הסמסטר הסתיים')}<p class="note">כל ימי הלימודים סומנו.</p>${dayPickHTML(null)}${otherSemNote()}</section>`;
   const n = Math.round((next.t - TODAY) / DAY);
-  return `<section class="card" id="today-card">${head('השיעור הבא', `${dayName(next.t)}, <span class="num">${dm(next.t)}</span>`)}<p class="note">${inDays(n)}.${sd.some(d => d.t < TODAY && !d.brk) ? ' כל ימי הלימודים שעברו סומנו.' : ''}</p>${otherSemNote()}</section>`;
+  return `<section class="card" id="today-card">${head('השיעור הבא', `${dayName(next.t)}, <span class="num">${dm(next.t)}</span>`)}<p class="note">${inDays(n)}.${sd.some(d => d.t < TODAY && !d.brk) ? ' כל ימי הלימודים שעברו סומנו.' : ''}</p>${dayPickHTML(null)}${otherSemNote()}</section>`;
+}
+/* Marking or fixing any day that passed, from the top card: a button per past day that was not marked (and "היום"
+   while another day is shown), and a list of every study day so far, marked or not. Choosing only shows the day;
+   nothing is marked until one of the answers is tapped. The buttons keep their place, so a double tap on one of
+   them only chooses the same day again. */
+const CHIP_MAX = 12;
+function dayStatus(key) {
+  const list = coursesOnDate(key); const map = dayMap(key); const vals = list.map(c => map[c.id]);
+  if (!vals.some(Boolean)) return ts(key) === TODAY ? 'עוד לא סומן' : 'לא סומן';
+  if (!vals.every(Boolean)) return 'סומן חלקית';
+  if (vals.includes('absent')) return vals.includes('present') ? 'נעדרתי מחלק מהשיעורים' : 'נעדרתי';
+  if (vals.every(v => v === 'cancelled' || v === 'none')) return 'לא היה שיעור';
+  return 'נכחתי';
+}
+function dayPickHTML(shown) {
+  const past = studyDates(tab).filter(d => !d.brk && d.t <= TODAY);
+  if (!past.some(d => d.t < TODAY)) return '';
+  const todayD = past.find(d => d.t === TODAY);
+  const un = past.filter(d => d.t < TODAY && daySummary(d.key).cls === 'warn');
+  const shownKey = shown || (todayD && todayD.key);
+  const chipList = un.slice(-CHIP_MAX);
+  const chips = chipList.length || (todayD && shown && shown !== todayD.key)
+    ? `<div class="pick-row" role="group" aria-label="בחירת יום לסימון">${chipList.length ? `<span class="note">${un.length === 1 ? 'יום שעבר ולא סומן:' : `${un.length} ימים שעברו ולא סומנו:`}</span>` : ''}`
+      + (todayD ? `<button type="button" class="btn small chip" id="pick-today" data-act="pick" data-k="${todayD.key}" aria-pressed="${shownKey === todayD.key}">היום</button>` : '')
+      + chipList.map(d => `<button type="button" class="btn small chip" id="pick-${d.key}" data-act="pick" data-k="${d.key}" aria-pressed="${shownKey === d.key}" aria-label="${esc(dayName(d.t) + ' ' + dm(d.t))}, לא סומן">${HE_WD[d.wd]} <span class="num">${dm(d.t)}</span></button>`).join('')
+      + (un.length > chipList.length ? `<span class="note">ועוד ${un.length - chipList.length} ברשימה "כל ימי הלימודים"</span>` : '') + '</div>'
+    : '';
+  const opts = past.slice().reverse().map(d => `<option value="${d.key}">${dayName(d.t)} ${dm(d.t)}${d.t === TODAY ? ' (היום)' : ''} · ${dayStatus(d.key)}</option>`).join('');
+  return `<div class="picker">${chips}<label class="pick-sel"><span>${un.length ? 'או לבחור יום אחר (גם כדי לתקן):' : 'לסמן או לתקן יום שעבר:'}</span><select class="field sel" id="pick-day"><option value="">בחירת תאריך…</option>${opts}</select></label></div>`;
+}
+/* show a day in the top card; today = back to the usual card.
+   from: 'chip' (a date button in the card: focus stays on it), 'list' (the date list) or 'square' (a course card:
+   the page scrolls up to the top card) */
+function focusCardAnswer() { const c = document.getElementById('today-card'); const f = c && c.querySelector('.answers button:not(:disabled), .seg button:not(:disabled)'); if (f) f.focus({ preventScroll: true }); }
+function pickDay(key, from) {
+  holdDay = key && ts(key) < TODAY ? key : null; confirmAll = null; clearAsk = null;
+  renderMain();
+  const card = document.getElementById('today-card'); if (!card) return;
+  if (from === 'square') card.scrollIntoView({ block: 'start' });
+  if (from !== 'chip') focusCardAnswer();
 }
 function talliesHTML() {
   const sem = semById(tab); const list = coursesFor(tab);
@@ -890,7 +947,7 @@ function talliesHTML() {
     let pk = 'ok', ptxt = 'תקין';
     if (lvl) { pk = started || !quiet ? lvl : 'idle'; ptxt = levelLabel(r); }
     else if (!started) { pk = 'idle'; ptxt = 'טרם התחיל'; }
-    const strip = r.cells.map(({ d, st }) => `<i class="sq ${st}${d.t === TODAY ? ' today' : ''}" title="${dm(d.t)}${st && st !== 'unmarked' ? ' · ' + ST[st] : ''}"></i>`).join('');
+    const strip = r.cells.map(({ d, st }) => `<i class="sq ${st}${d.t === TODAY ? ' today' : ''}${d.t <= TODAY ? ' go" data-act="pick" data-k="' + d.key : ''}" title="${dm(d.t)}${st && st !== 'unmarked' ? ' · ' + ST[st] : ''}${d.t <= TODAY ? ' · לחצו כדי לסמן' : ''}"></i>`).join('');
     const meter = r.allowed == null
       ? `<div class="meter"><span class="n">${r.absent}</span><span class="u">היעדרויות (המכסה לא הוגדרה)</span></div>`
       : r.left >= 0
@@ -997,7 +1054,7 @@ function semSummaryHTML() {
     : `<p class="note">עוד לא עברו ימי לימודים בסמסטר הזה.</p>`}
   </section>`;
 }
-const coursesTopHTML = () => alertsHTML() + todayHTML() + semSummaryHTML() + `<section class="section" aria-labelledby="cc-h"><h2 id="cc-h">לפי קורס</h2>${talliesHTML()}</section>` + ledgerHTML();
+const coursesTopHTML = () => alertsHTML() + todayHTML() + semSummaryHTML() + ledgerHTML() + `<section class="section" aria-labelledby="cc-h"><h2 id="cc-h">לפי קורס</h2>${talliesHTML()}</section>`;
 function coursesViewHTML() {
   const panel = inner => `<div id="sem-panel" role="tabpanel" aria-labelledby="tab-${tab}" class="section">${inner}</div>`;
   if (!isSetup(tab)) return semTabsHTML() + panel(setupHTML(tab));
@@ -1100,28 +1157,62 @@ function pracSegHTML(key, cur, label, where) {
       ? `<button type="button" class="clr" id="ps-${where}-${esc(key)}-clr" data-act="pclear" data-k="${esc(key)}" aria-label="ניקוי הסימון: ${esc(label)}" title="ניקוי"${dis}>×</button>`
       : `<button type="button" class="clr" tabindex="-1" aria-hidden="true" style="visibility:hidden" disabled>×</button>`) + '</div>';
 }
+/* practicum days that passed and were not marked (in schedule order) */
+const pracUnmarked = () => me.prac ? pracSchedule(me.prac).filter(d => d.t < TODAY && !me.prac.marks[d.key]) : [];
+/* the same day chooser as in the courses card: buttons for days not marked, and a list of every practicum day so far */
+function pracPickHTML(T, p, shown) {
+  const past = T.sched.filter(d => d.t <= TODAY);
+  if (!past.some(d => d.t < TODAY)) return '';
+  const todayD = past.find(d => d.t === TODAY);
+  const un = past.filter(d => d.t < TODAY && !p.marks[d.key]);
+  const shownKey = shown || (todayD && todayD.key);
+  const chipList = un.slice(-CHIP_MAX);
+  const chips = chipList.length || (todayD && shown && shown !== todayD.key)
+    ? `<div class="pick-row" role="group" aria-label="בחירת יום הכשרה לסימון">${chipList.length ? `<span class="note">${un.length === 1 ? 'יום שעבר ולא סומן:' : `${un.length} ימים שעברו ולא סומנו:`}</span>` : ''}`
+      + (todayD ? `<button type="button" class="btn small chip" id="ppick-today" data-act="ppick" data-k="${todayD.key}" aria-pressed="${shownKey === todayD.key}">היום</button>` : '')
+      + chipList.map(d => `<button type="button" class="btn small chip" id="ppick-${d.key}" data-act="ppick" data-k="${d.key}" aria-pressed="${shownKey === d.key}" aria-label="${esc(pracLabel(d.t))}, לא סומן">${HE_WD[d.wd]} <span class="num">${dm(d.t)}</span></button>`).join('')
+      + (un.length > chipList.length ? `<span class="note">ועוד ${un.length - chipList.length} ברשימה "ימי ההכשרה" למטה</span>` : '') + '</div>'
+    : '';
+  const st = k => p.marks[k] === 'done' ? 'הייתי' : p.marks[k] === 'missed' ? 'לא הייתי' : ts(k) === TODAY ? 'עוד לא סומן' : 'לא סומן';
+  const opts = past.slice().reverse().map(d => `<option value="${d.key}">${pracLabel(d.t)}${d.t === TODAY ? ' (היום)' : ''} · ${st(d.key)}</option>`).join('');
+  return `<div class="picker">${chips}<label class="pick-sel"><span>${un.length ? 'או לבחור יום אחר (גם כדי לתקן):' : 'לסמן או לתקן יום שעבר:'}</span><select class="field sel" id="ppick-day"><option value="">בחירת תאריך…</option>${opts}</select></label></div>`;
+}
+function pickPrac(key, from) {
+  if (!me.prac) return;
+  pracHold = ts(key) < TODAY ? key : null;
+  renderMain();
+  const card = document.getElementById('today-card'); if (!card) return;
+  if (from === 'square') card.scrollIntoView({ block: 'start' });
+  if (from !== 'chip') focusCardAnswer();
+}
 function pracViewHTML() {
   if (!me.prac || pracEditing) return pracSetupHTML();
   const p = me.prac; const T = pracTally(p); const dis = ready() ? '' : ' disabled';
   const todayKey = iso(TODAY); const todayIn = T.sched.find(d => d.key === todayKey);
   const head = (label, date) => `<div class="today-head"><h2 class="label">${label}</h2><span class="today-date">${date}</span></div>`;
   let todayCard;
-  if (todayIn) {
-    todayCard = `<section class="card" id="today-card">${head('היום', pracLabel(TODAY))}<span class="q">הייתם היום בהכשרה?</span>${pracSegHTML(todayKey, p.marks[todayKey], 'היום, ' + pracLabel(TODAY), 'pt')}</section>`;
+  const un = T.sched.filter(d => d.t < TODAY && !p.marks[d.key]);
+  const inSched = k => T.sched.some(d => d.key === k);
+  /* a past day chosen in the card or just answered there stays until "ליום הבא" / "היום" (see the courses card) */
+  const held = pracHold && ts(pracHold) < TODAY && (inSched(pracHold) || p.marks[pracHold]) ? pracHold : null;
+  if (held) {
+    const left = un.filter(d => d.key !== held).length;
+    const title = p.marks[held] ? 'סימנתם יום שעבר' : un.length === 1 ? 'יום הכשרה אחד לא סומן' : `${un.length} ימי הכשרה לא סומנו`;
+    todayCard = `<section class="card" id="today-card">${head(title, pracLabel(ts(held)))}<span class="q">הייתם בהכשרה ב-${dm(ts(held))}?</span>${pracSegHTML(held, p.marks[held], pracLabel(ts(held)), 'pt')}
+      ${left ? `<div class="next-row"><button type="button" class="btn primary" id="ptoday-next" data-act="ptoday-next" data-k="${held}">${left === 1 ? 'ליום הבא שלא סומן (נותר אחד)' : `ליום הבא שלא סומן (נותרו ${left})`}</button></div>` : `<p class="note">כל ימי ההכשרה שעברו סומנו. <button type="button" class="btn small ghost" id="ptoday-next" data-act="ptoday-next" data-k="${held}">${todayIn ? 'חזרה להיום' : 'סגירה'}</button></p>`}
+      ${pracPickHTML(T, p, held)}</section>`;
+  } else if (todayIn) {
+    todayCard = `<section class="card" id="today-card">${head('היום', pracLabel(TODAY))}<span class="q">הייתם היום בהכשרה?</span>${pracSegHTML(todayKey, p.marks[todayKey], 'היום, ' + pracLabel(TODAY), 'pt')}${pracPickHTML(T, p, todayKey)}</section>`;
   } else {
-    const un = T.sched.filter(d => d.t < TODAY && !p.marks[d.key]);
     const next = T.sched.find(d => d.t > TODAY);
-    if (pracHold && ts(pracHold) < TODAY && p.marks[pracHold]) {
-      const left = un.length;
-      todayCard = `<section class="card" id="today-card">${head('סימנתם יום שעבר', pracLabel(ts(pracHold)))}<span class="q">הייתם בהכשרה ב-${dm(ts(pracHold))}?</span>${pracSegHTML(pracHold, p.marks[pracHold], pracLabel(ts(pracHold)), 'pt')}
-        ${left ? `<div class="next-row"><button type="button" class="btn primary" id="ptoday-next" data-act="ptoday-next" data-k="${pracHold}">${left === 1 ? 'ליום הבא שלא סומן (נותר אחד)' : `ליום הבא שלא סומן (נותרו ${left})`}</button></div>` : `<p class="note">כל ימי ההכשרה שעברו סומנו. <button type="button" class="btn small ghost" id="ptoday-next" data-act="ptoday-next" data-k="${pracHold}">סגירה</button></p>`}</section>`;
-    } else if (un.length) { const last = un[un.length - 1]; todayCard = `<section class="card" id="today-card">${head(un.length === 1 ? 'יום הכשרה אחד לא סומן' : `${un.length} ימי הכשרה לא סומנו`, pracLabel(last.t))}<span class="q">הייתם בהכשרה ב-${dm(last.t)}?</span>${pracSegHTML(last.key, p.marks[last.key], pracLabel(last.t), 'pt')}</section>`; }
-    else if (next) { const n = Math.round((next.t - TODAY) / DAY); todayCard = `<section class="card" id="today-card">${head('יום ההכשרה הבא', pracLabel(next.t))}<p class="note">${inDays(n)}.</p></section>`; }
-    else todayCard = `<section class="card" id="today-card">${head('ההכשרה', 'הסתיימה')}</section>`;
+    if (un.length) { const last = un[un.length - 1]; todayCard = `<section class="card" id="today-card">${head(un.length === 1 ? 'יום הכשרה אחד לא סומן' : `${un.length} ימי הכשרה לא סומנו`, pracLabel(last.t))}<span class="q">הייתם בהכשרה ב-${dm(last.t)}?</span>${pracSegHTML(last.key, p.marks[last.key], pracLabel(last.t), 'pt')}${pracPickHTML(T, p, last.key)}</section>`; }
+    else if (next) { const n = Math.round((next.t - TODAY) / DAY); todayCard = `<section class="card" id="today-card">${head('יום ההכשרה הבא', pracLabel(next.t))}<p class="note">${inDays(n)}.</p>${pracPickHTML(T, p, null)}</section>`; }
+    else todayCard = `<section class="card" id="today-card">${head('ההכשרה', 'הסתיימה')}${pracPickHTML(T, p, null)}</section>`;
   }
-  const strip = T.sched.map(d => { const m = p.marks[d.key]; const cls = m === 'done' ? 'done' : m === 'missed' ? 'missed' : d.t < TODAY ? 'unmarked' : ''; return `<i class="sq ${cls}${d.t === TODAY ? ' today' : ''}" title="${pracLabel(d.t)}"></i>`; }).join('');
+  const strip = T.sched.map(d => { const m = p.marks[d.key]; const cls = m === 'done' ? 'done' : m === 'missed' ? 'missed' : d.t < TODAY ? 'unmarked' : ''; return `<i class="sq ${cls}${d.t === TODAY ? ' today' : ''}${d.t <= TODAY ? ' go" data-act="ppick" data-k="' + d.key : ''}" title="${pracLabel(d.t)}${d.t <= TODAY ? ' · לחצו כדי לסמן' : ''}"></i>`; }).join('');
   const months = {}; for (const d of T.sched) { const k = d.key.slice(0, 7); (months[k] = months[k] || []).push(d); }
-  if (!pracOpenMonths) pracOpenMonths = new Set([iso(TODAY).slice(0, 7)]);
+  /* open: this month, and every month with a day that passed and was not marked */
+  if (!pracOpenMonths) pracOpenMonths = new Set([iso(TODAY).slice(0, 7), ...un.map(d => d.key.slice(0, 7))]);
   const ledger = Object.keys(months).map(k => {
     const list = months[k]; const [y, m] = k.split('-').map(Number);
     const dn = list.filter(d => p.marks[d.key] === 'done').length;
@@ -1765,6 +1856,9 @@ function onAct(b) {
   if (act === 'view') { if (view !== b.dataset.v) hideToast(); view = b.dataset.v; viewPicked = true; holdDay = pracHold = null; renderAll(); return; }
   if (act === 'tab') { tab = b.dataset.sem; confirmDelete = null; holdDay = null; renderAll(); if (b.id.startsWith('go-')) focusId('tab-' + tab); return; }
   if (act === 'toggle') { openDays.has(key) ? openDays.delete(key) : openDays.add(key); renderMain(); return; }
+  /* choosing a day only shows it, so it works while saving or in a read-only tab too */
+  if (act === 'pick') { if (key && semOf(key) && ts(key) <= TODAY) pickDay(key, b.closest('#today-card') ? 'chip' : 'square'); return; }
+  if (act === 'ppick') { if (key && ts(key) <= TODAY) pickPrac(key, b.closest('#today-card') ? 'chip' : 'square'); return; }
   if (act === 'code-back') { pendingCred = null; codeErr = ''; renderMain(); return; }
   if (act === 'use-here') { claimTab(); renderAll(); lastPull = 0; if (mode === 'remote') setTimeout(pull, 300); return; }
   if (act === 'logout') { logout(); return; }
@@ -1815,8 +1909,16 @@ function onAct(b) {
   if (act === 'pclear') { setPracMark(key, null); focusId(b.id.replace(/-clr$/, '-done')); return; }
   if (act === 'pextra-del') { setPracMark(key, null); focusId('px-date'); return; }
   if (act === 'ptotal-reset') { me = { ...me, prac: { ...me.prac, total: null } }; renderAll(); writeMe(); toast('סה״כ הימים מחושב שוב לפי הלוח.'); focusId('pt-total'); return; }
-  if (act === 'today-next') { holdDay = null; renderMain(); const f = document.querySelector('#today-card .answers button'); if (f) f.focus({ preventScroll: true }); return; }
-  if (act === 'ptoday-next') { pracHold = null; renderMain(); const f = document.querySelector('#today-card .seg button'); if (f) f.focus({ preventScroll: true }); return; }
+  if (act === 'today-next') {    // the latest past day still not marked, or back to the usual card
+    const rest = unmarkedPast(tab).filter(d => d.key !== holdDay);
+    holdDay = rest.length ? rest[rest.length - 1].key : null; confirmAll = null; clearAsk = null;
+    renderMain(); focusCardAnswer(); return;
+  }
+  if (act === 'ptoday-next') {
+    const rest = pracUnmarked().filter(d => d.key !== pracHold);
+    pracHold = rest.length ? rest[rest.length - 1].key : null;
+    renderMain(); focusCardAnswer(); return;
+  }
   if (!key || !semOf(key)) return;
   const list = coursesOnDate(key);
   const future = ts(key) > TODAY;
@@ -1890,6 +1992,11 @@ function updatePracDraft(t) {
 }
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t.dataset) return;
+  if (t.id === 'pick-day' || t.id === 'ppick-day') {
+    const k = t.value; if (!k || !/^\d{4}-\d{2}-\d{2}$/.test(k) || ts(k) > TODAY) return;
+    if (t.id === 'pick-day') { if (semOf(k)) pickDay(k, 'list'); } else pickPrac(k, 'list');
+    return;
+  }
   if (t.dataset.sf === 'on' || t.dataset.sf === 'wd') {
     const i = Number(t.dataset.i); const r = draftFor(tab)[i]; if (!r) return;
     if (t.dataset.sf === 'on') {
