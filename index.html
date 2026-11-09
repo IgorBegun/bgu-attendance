@@ -1248,9 +1248,24 @@ function pracViewHTML() {
    done once every class of the day is marked and the student was present in at least one, missed if every class held that day was missed, and drops
    out if all classes were cancelled. Practicum days come from the practicum count (total, done, still to make up). */
 function overallTally() {
-  const o = { sTotal: 0, sDone: 0, sMiss: 0, sUn: 0, pTotal: 0, pDone: 0, pMiss: 0, pUn: 0, semsSet: 0 };
+  const o = { sTotal: 0, sDone: 0, sMiss: 0, sUn: 0, pTotal: 0, pDone: 0, pMiss: 0, pUn: 0, semsSet: 0, est: null };
+  /* A semester whose courses are not set up yet still counts for the whole year: its study days are estimated as
+     the days (outside breaks and holidays) on the weekdays of the courses of the semester that is set up. Once its
+     own courses are set up, its real days are counted instead. */
+  const from = SEM_DAYS.find(s => isSetup(s.id) && coursesFor(s.id).length);
+  const estWd = from ? new Set(coursesFor(from.id).map(wdOf)) : new Set();
   for (const sem of SEM_DAYS) {
-    if (!isSetup(sem.id)) continue;
+    if (!isSetup(sem.id)) {
+      if (!estWd.size) continue;
+      let n = 0;
+      for (const d of sem.all) {
+        if (d.brk || !estWd.has(d.wd)) continue;
+        n++; o.sTotal++;
+        if (d.t < TODAY) o.sUn++;
+      }
+      if (n) o.est = { sem: sem.name, from: from.name, days: n, wds: [...estWd].sort() };
+      continue;
+    }
     o.semsSet++;
     for (const d of studyDates(sem.id)) {
       if (d.brk) continue;
@@ -1280,15 +1295,15 @@ function progressHTML() {
   const notes = [];
   if (o.miss) notes.push(o.miss === 1 ? 'נעדרתם יום אחד' : `נעדרתם ${o.miss} ימים`);
   if (o.un) notes.push(o.un === 1 ? 'יום אחד עבר ולא סומן' : `${o.un} ימים עברו ולא סומנו`);
-  const missing = [];
-  if (o.semsSet < 2) missing.push(isSetup('A') ? 'סמסטר ב׳' : 'סמסטר א׳');
-  if (!me.prac) missing.push('ההכשרה המעשית');
-  const verb = missing.length > 1 ? 'ייכנסו' : missing[0] === 'ההכשרה המעשית' ? 'תיכנס' : 'ייכנס';
+  const later = [];
+  if (o.est) later.push(`${o.est.days} ימי הלימודים של ${o.est.sem} נספרים בינתיים לפי ימי השבוע של ${o.est.from} (${o.est.wds.map(w => HE_WD[w]).join(', ')}). אחרי הגדרת הקורסים של ${o.est.sem} הספירה תתעדכן.`);
+  else if (o.semsSet < 2 && !SEM_DAYS.some(s => isSetup(s.id) && coursesFor(s.id).length)) later.push('ימי הלימודים ייכנסו לחישוב אחרי הגדרת הקורסים.');
+  if (!me.prac) later.push('ההכשרה המעשית תיכנס לחישוב אחרי ההגדרה.');
   return `<section class="card progress" aria-labelledby="ov-h">
     <div class="barrow"><div class="lbl"><h2 id="ov-h" class="label">התקדמות כללית בשנה: ימי לימודים וימי הכשרה</h2><b dir="ltr">${pc}</b></div>
     <div class="bar stack" role="img" aria-label="הושלמו ${o.done} מתוך ${o.total} ימים, ${pc}"><i class="ok" style="width:${w(o.done)}%"></i>${seg(o.miss, 'r')}${seg(o.un, 'u')}</div></div>
     <p class="note">${parts.join(' · ')}${notes.length ? ` · ${notes.join(' · ')}` : ''}</p>
-    ${missing.length ? `<p class="note">${missing.join(' ו')} ${verb} לחישוב אחרי ההגדרה.</p>` : ''}
+    ${later.map(t => `<p class="note">${t}</p>`).join('')}
   </section>`;
 }
 
