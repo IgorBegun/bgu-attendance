@@ -536,6 +536,8 @@ function normPrac(p) {
     for (const k of Object.keys(p.marks)) if (isIso(k) && k >= '2026-09-01' && k <= '2027-09-30' && (p.marks[k] === 'done' || p.marks[k] === 'missed')) marks[k] = p.marks[k];
   const out = { days, start: p.start, end: p.end, winterOnce: !!p.winterOnce, total: intIn(p.total, 1, 300), marks };
   const wday = intIn(p.winterDay, 0, 5); if (wday != null) out.winterDay = wday;
+  /* allowed: how many practicum days may be missed in each semester (optional, set by the student) */
+  const al = intIn(p.allowed, 0, 20); if (al != null) out.allowed = al;
   /* changes: from date "from" on, practicum is on "days" (for example other days in semester B) */
   const ch = Array.isArray(p.changes) ? p.changes.filter(x => x && isIso(x.from) && Array.isArray(x.days))
     .map(x => ({ from: x.from, days: [...new Set(x.days.filter(n => Number.isInteger(n) && n >= 0 && n <= 5))].sort() }))
@@ -686,7 +688,10 @@ function pracTally(p) {
   const madeUp = extra.filter(k => p.marks[k] === 'done').length;
   const toMakeUp = Math.max(0, missed - madeUp);
   const per = total ? 100 / total : 0;
-  return { sched, total, done, missed, madeUp, toMakeUp, unmarked, extra, per, remaining: Math.max(0, 100 - done * per) };
+  /* missed days per semester (the winter break belongs to semester A), against the optional limit */
+  const bStart = SEMS[1].start; const missSem = { A: 0, B: 0 };
+  for (const k in p.marks) if (p.marks[k] === 'missed') missSem[k < bStart ? 'A' : 'B']++;
+  return { sched, total, done, missed, madeUp, toMakeUp, unmarked, extra, per, missSem, remaining: Math.max(0, 100 - done * per) };
 }
 
 /* ===================== pieces ===================== */
@@ -1078,7 +1083,7 @@ const pracStarted = () => !!me.prac && TODAY > ts(me.prac.start);
 function pracFromDraft(d) {
   if (!d.days.length || !isIso(d.start) || !isIso(d.end) || d.start > d.end) return null;
   const days = [...d.days].sort(); const base = me.prac;
-  const common = { start: d.start, end: d.end, winterOnce: d.winterOnce, winterDay: d.winterDay, total: String(d.total).trim() ? Number(String(d.total).trim()) : null, marks: base ? base.marks : {} };
+  const common = { start: d.start, end: d.end, winterOnce: d.winterOnce, winterDay: d.winterDay, total: String(d.total).trim() ? Number(String(d.total).trim()) : null, allowed: String(d.allowed ?? '').trim() ? Number(String(d.allowed).trim()) : null, marks: base ? base.marks : {} };
   if (!base || !pracStarted() || !isIso(d.from) || d.from <= d.start) return normPrac({ ...common, days });
   const changes = (base.changes || []).filter(c => c.from < d.from);
   let prev = base.days; for (const c of changes) prev = c.days;
@@ -1096,7 +1101,7 @@ function pracSetupHTML() {
   if (!pracDraft) {
     const p = me.prac || PRAC_DEFAULT; const from = pracStarted() ? iso(TODAY) : p.start;
     const days = me.prac ? pracDaysAt(me.prac, from) : p.days;
-    pracDraft = { days: [...days], start: p.start, end: p.end, winterOnce: p.winterOnce !== false, winterDay: Number.isInteger(p.winterDay) ? p.winterDay : null, total: me.prac && me.prac.total ? String(me.prac.total) : '', from };
+    pracDraft = { days: [...days], start: p.start, end: p.end, winterOnce: p.winterOnce !== false, winterDay: Number.isInteger(p.winterDay) ? p.winterDay : null, total: me.prac && me.prac.total ? String(me.prac.total) : '', allowed: me.prac && me.prac.allowed != null ? String(me.prac.allowed) : '', from };
   }
   const d = pracDraft; const dis = ready() ? '' : ' disabled';
   return `<form class="card pform" id="prac-form" novalidate>
@@ -1114,19 +1119,21 @@ function pracSetupHTML() {
     <div class="row"><label class="allow">ביום<select class="field sel" id="pf-wday" data-pf="wday"${d.winterOnce ? '' : ' disabled'}${dis}>${winterOptions(d)}</select></label></div>
     <p class="calc" id="pf-calc" aria-live="polite">${pracCalcHTML(pracCalcOf(d))}</p>
     <div class="row"><label class="f">סה״כ ימי הכשרה (רק אם במחלקה נקבע מספר אחר)<input class="field n" type="number" inputmode="numeric" min="1" max="300" id="pf-total" data-pf="total" value="${esc(d.total)}" aria-describedby="pf-calc"${dis}></label></div>
+    <div class="row"><label class="f">היעדרויות מותרות בכל סמסטר (לא חובה; לפי מה שנקבע במקום ההכשרה)<input class="field n" type="number" inputmode="numeric" min="0" max="20" id="pf-allowed" data-pf="allowed" value="${esc(d.allowed)}"${dis}></label></div>
     ${pracErr ? `<p class="err">${esc(pracErr)}</p>` : ''}
     <div class="setup-actions"><button type="submit" class="btn primary" id="pf-save"${dis}>שמירה</button>${me.prac ? `<button type="button" class="btn" id="pf-cancel" data-act="prac-cancel">ביטול</button>` : ''}</div>
   </form>`;
 }
 function savePracSetup() {
   const d = pracDraft; pracErr = '';
-  const tot = String(d.total).trim();
+  const tot = String(d.total).trim(); const alw = String(d.allowed ?? '').trim();
   if (!d.days.length) pracErr = 'בחרו לפחות יום הכשרה אחד.';
   else if (!isIso(d.start) || !isIso(d.end) || d.start > d.end) pracErr = 'בדקו את תאריכי ההתחלה והסיום.';
   else if (pracStarted() && (!isIso(d.from) || d.from > d.end)) pracErr = 'בדקו את התאריך שממנו הימים חלים.';
   else if (!pracCalcOf(d)) pracErr = 'בטווח התאריכים הזה אין אף יום הכשרה. בדקו את הימים והתאריכים.';
   else if (tot && (!/^\d+$/.test(tot) || Number(tot) < 1 || Number(tot) > 300)) pracErr = 'סה״כ ימים צריך להיות מספר בין 1 ל-300.';
   else if (tot && Number(tot) < pracDoneCount()) pracErr = `כבר סימנתם שהייתם בהכשרה ${nDays(pracDoneCount())}, אז הסה״כ לא יכול להיות קטן מזה.`;
+  if (!pracErr && alw && (!/^\d+$/.test(alw) || Number(alw) > 20)) pracErr = 'היעדרויות מותרות בסמסטר: מספר בין 0 ל-20, או להשאיר ריק.';
   if (pracErr) { renderMain(); announce(pracErr); const e = document.querySelector('#prac-form .err'); if (e) e.scrollIntoView({ block: 'nearest' }); return; }
   const p = pracFromDraft(d);
   const cal = pracSchedule(p).length;
@@ -1185,6 +1192,18 @@ function pickPrac(key, from) {
   if (from === 'square') card.scrollIntoView({ block: 'start' });
   if (from !== 'chip') focusCardAnswer();
 }
+/* absences against the limit per semester: yellow when one is left, red when none are left (as in the courses) */
+function pracAllowHTML(p, T) {
+  if (p.allowed == null) return '';
+  const bStart = SEMS[1].start; const cur = iso(TODAY) < bStart ? 'A' : 'B';
+  const sems = [['A', 'סמסטר א׳'], ['B', 'סמסטר ב׳']].filter(([id]) => id === 'A' ? p.start < bStart : p.end >= bStart);
+  return sems.map(([id, name]) => {
+    const used = T.missSem[id], left = p.allowed - used;
+    const cls = !used ? 'ok' : left <= 0 ? 'over' : left === 1 ? 'edge' : 'ok';
+    const txt = left < 0 ? `${nAbs(-left)} מעבר למותר` : left === 0 ? 'לא נותרו היעדרויות' : left === 1 ? 'נותרה היעדרות אחת' : `נותרו ${left} היעדרויות`;
+    return `<div class="meta pallow" id="pallow-${id}"><span>היעדרויות ב${name}${id === cur ? ' (עכשיו)' : ''}: <b>${used}</b> מתוך <b>${p.allowed}</b></span><span class="pill ${cls}">${txt}</span></div>`;
+  }).join('');
+}
 function pracViewHTML() {
   if (!me.prac || pracEditing) return pracSetupHTML();
   const p = me.prac; const T = pracTally(p); const dis = ready() ? '' : ' disabled';
@@ -1227,6 +1246,7 @@ function pracViewHTML() {
       <div class="prac-big"><span class="n">${pctTrim(T.remaining)}</span><span class="u">מההכשרה עוד לפניכם · השלמתם <b dir="ltr">${pctTrim(100 - T.remaining)}</b></span></div>
       <form class="row-inline" id="ptotal-form" novalidate><label class="allow">ימי הכשרה בשנה (ימים, לא שעות)<input class="field n" type="number" inputmode="numeric" min="1" max="300" id="pt-total" name="total" value="${T.total}"${dis}></label><button type="submit" class="btn small" id="pt-save"${dis}>עדכון</button>${p.total ? `<button type="button" class="btn small ghost" id="pt-reset" data-act="ptotal-reset"${dis}>לפי הלוח (${T.sched.length})</button>` : ''}</form>
       <div class="meta"><span>הייתי <b>${T.done}</b> מתוך <b>${T.total}</b> ימים</span><span>${left === 1 ? 'נותר <b>יום אחד</b>' : `נותרו <b>${left}</b> ימים`}</span><span>יום אחד = <b dir="ltr">${fix2(T.per)}%</b></span>${T.missed ? `<span>ימים שלא הייתי: <b>${T.missed}</b>${T.madeUp ? ` · הושלמו: <b>${Math.min(T.madeUp, T.missed)}</b>` : ''} · ימים שצריך להשלים: <b>${T.toMakeUp}</b></span>` : ''}</div>
+      ${pracAllowHTML(p, T)}
       <p class="note">ימי ההכשרה: ${daysLabel(p.days)}${(p.changes || []).map(c => `; מ-<span class="num">${dm(ts(c.from))}</span>: ${daysLabel(c.days)}`).join('')}${p.winterOnce ? `; בחופשת הסמסטר פעם בשבוע` : ''}.</p>
       ${(() => { const dP = T.total ? T.done / T.total * 100 : 0, mP = T.total ? T.toMakeUp / T.total * 100 : 0;
         const held = T.done + T.missed;
@@ -2002,6 +2022,7 @@ function updatePracDraft(t) {
   else if (f === 'wday') pracDraft.winterDay = Number(t.value);
   else if (f === 'from') pracDraft.from = t.value;
   else if (f === 'total') pracDraft.total = t.value;
+  else if (f === 'allowed') pracDraft.allowed = t.value;
   if (f === 'day') { const w = document.getElementById('pf-wday'); if (w) w.innerHTML = pracDraft.days.length ? winterOptions(pracDraft) : ''; }
   const c = document.getElementById('pf-calc'); if (c) c.innerHTML = pracCalcHTML(pracCalcOf(pracDraft));
 }
