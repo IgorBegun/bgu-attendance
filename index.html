@@ -495,7 +495,7 @@ const dayMap = key => (me.marks && me.marks[key]) || {};
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const isIso = k => typeof k === 'string' && ISO_RE.test(k) && iso(ts(k)) === k;
-const intIn = (v, lo, hi) => { if (v === null || v === '' || typeof v === 'boolean') return null; const n = Number(v); return Number.isInteger(n) && n >= lo && n <= hi ? n : null; };
+const intIn = (v, lo, hi) => { if (v === null || v === '' || typeof v === 'boolean' || typeof v === 'object') return null; const n = Number(v); return Number.isInteger(n) && n >= lo && n <= hi ? n : null; };
 const strIn = (v, max) => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '').slice(0, max);
 const MARKS_OK = new Set(['present', 'absent', 'cancelled', 'none']);
 function normCourseList(v) {
@@ -538,6 +538,8 @@ function normPrac(p) {
   const wday = intIn(p.winterDay, 0, 5); if (wday != null) out.winterDay = wday;
   /* allowed: how many practicum days may be missed in each semester (optional, set by the student) */
   const al = intIn(p.allowed, 0, 20); if (al != null) out.allowed = al;
+  /* pv: written by versions of the page that know "allowed"; an older page drops both keys (see keepLimit) */
+  if (p.pv === 1 || al != null) out.pv = 1;
   /* changes: from date "from" on, practicum is on "days" (for example other days in semester B) */
   const ch = Array.isArray(p.changes) ? p.changes.filter(x => x && isIso(x.from) && Array.isArray(x.days))
     .map(x => ({ from: x.from, days: [...new Set(x.days.filter(n => Number.isInteger(n) && n >= 0 && n <= 5))].sort() }))
@@ -663,6 +665,14 @@ function daySummary(key) {
   return { cls: partial && t < TODAY ? 'warn' : abs.length ? 'some' : partial ? '' : 'all', text: parts.join(' · '), partial };
 }
 
+/* A copy of the page from before the absence limit existed does not know "allowed": it drops the key and saves the
+   state without it. That is not a decision to remove the limit, so the limit we have is kept (and saved again).
+   A page that knows the limit always writes pv, so removing the limit on purpose still works. */
+function keepLimit(mine, theirs) {
+  if (!mine || !mine.prac || !theirs || !theirs.prac) return theirs;
+  if (theirs.prac.pv === 1 || mine.prac.allowed == null || theirs.prac.allowed != null) return theirs;
+  return { ...theirs, prac: { ...theirs.prac, allowed: mine.prac.allowed, pv: 1 } };
+}
 /* ===================== counting: practicum ===================== */
 const pracDaysAt = (p, key) => { let ds = p.days; if (p.changes) for (const ch of p.changes) if (key >= ch.from) ds = ch.days; return ds; };
 const pracWinterDay = (p, days) => days.includes(p.winterDay) ? p.winterDay : Math.min(...days);
@@ -1083,7 +1093,7 @@ const pracStarted = () => !!me.prac && TODAY > ts(me.prac.start);
 function pracFromDraft(d) {
   if (!d.days.length || !isIso(d.start) || !isIso(d.end) || d.start > d.end) return null;
   const days = [...d.days].sort(); const base = me.prac;
-  const common = { start: d.start, end: d.end, winterOnce: d.winterOnce, winterDay: d.winterDay, total: String(d.total).trim() ? Number(String(d.total).trim()) : null, allowed: String(d.allowed ?? '').trim() ? Number(String(d.allowed).trim()) : null, marks: base ? base.marks : {} };
+  const common = { start: d.start, end: d.end, winterOnce: d.winterOnce, winterDay: d.winterDay, total: String(d.total).trim() ? Number(String(d.total).trim()) : null, allowed: String(d.allowed ?? '').trim() ? Number(String(d.allowed).trim()) : null, pv: 1, marks: base ? base.marks : {} };
   if (!base || !pracStarted() || !isIso(d.from) || d.from <= d.start) return normPrac({ ...common, days });
   const changes = (base.changes || []).filter(c => c.from < d.from);
   let prev = base.days; for (const c of changes) prev = c.days;
@@ -1127,14 +1137,18 @@ function pracSetupHTML() {
 function savePracSetup() {
   const d = pracDraft; pracErr = '';
   const tot = String(d.total).trim(); const alw = String(d.allowed ?? '').trim();
+  const badIn = id => { const e = document.getElementById(id); return !!(e && e.validity && e.validity.badInput); };
+  let badField = '';
   if (!d.days.length) pracErr = 'בחרו לפחות יום הכשרה אחד.';
   else if (!isIso(d.start) || !isIso(d.end) || d.start > d.end) pracErr = 'בדקו את תאריכי ההתחלה והסיום.';
   else if (pracStarted() && (!isIso(d.from) || d.from > d.end)) pracErr = 'בדקו את התאריך שממנו הימים חלים.';
   else if (!pracCalcOf(d)) pracErr = 'בטווח התאריכים הזה אין אף יום הכשרה. בדקו את הימים והתאריכים.';
   else if (tot && (!/^\d+$/.test(tot) || Number(tot) < 1 || Number(tot) > 300)) pracErr = 'סה״כ ימים צריך להיות מספר בין 1 ל-300.';
   else if (tot && Number(tot) < pracDoneCount()) pracErr = `כבר סימנתם שהייתם בהכשרה ${nDays(pracDoneCount())}, אז הסה״כ לא יכול להיות קטן מזה.`;
-  if (!pracErr && alw && (!/^\d+$/.test(alw) || Number(alw) > 20)) pracErr = 'היעדרויות מותרות בסמסטר: מספר בין 0 ל-20, או להשאיר ריק.';
-  if (pracErr) { renderMain(); announce(pracErr); const e = document.querySelector('#prac-form .err'); if (e) e.scrollIntoView({ block: 'nearest' }); return; }
+  if (!pracErr && badIn('pf-total')) { pracErr = 'סה״כ ימים צריך להיות מספר שלם בין 1 ל-300, או להשאיר ריק.'; badField = 'pf-total'; }
+  if (!pracErr && (badIn('pf-allowed') || (alw && (!/^\d+$/.test(alw) || Number(alw) > 20)))) { pracErr = 'היעדרויות מותרות בסמסטר: מספר שלם בין 0 ל-20, או להשאיר ריק.'; badField = 'pf-allowed'; }
+  if (pracErr) { renderMain(); announce(pracErr); const e = document.querySelector('#prac-form .err'); if (e) e.scrollIntoView({ block: 'nearest' });
+    const bf = badField && document.getElementById(badField); if (bf) { bf.classList.add('bad'); bf.setAttribute('aria-invalid', 'true'); bf.focus(); } return; }
   const p = pracFromDraft(d);
   const cal = pracSchedule(p).length;
   if (p.total && p.total === cal) p.total = null;     // same as the calendar: keep it automatic
@@ -1196,11 +1210,11 @@ function pickPrac(key, from) {
 function pracAllowHTML(p, T) {
   if (p.allowed == null) return '';
   const bStart = SEMS[1].start; const cur = iso(TODAY) < bStart ? 'A' : 'B';
-  const sems = [['A', 'סמסטר א׳'], ['B', 'סמסטר ב׳']].filter(([id]) => id === 'A' ? p.start < bStart : p.end >= bStart);
+  const sems = [['A', 'סמסטר א׳'], ['B', 'סמסטר ב׳']].filter(([id]) => T.missSem[id] > 0 || (id === 'A' ? p.start < bStart : p.end >= bStart));
   return sems.map(([id, name]) => {
     const used = T.missSem[id], left = p.allowed - used;
-    const cls = !used ? 'ok' : left <= 0 ? 'over' : left === 1 ? 'edge' : 'ok';
-    const txt = left < 0 ? `${nAbs(-left)} מעבר למותר` : left === 0 ? 'לא נותרו היעדרויות' : left === 1 ? 'נותרה היעדרות אחת' : `נותרו ${left} היעדרויות`;
+    const cls = !used ? (p.allowed === 0 ? 'idle' : 'ok') : left <= 0 ? 'over' : left === 1 ? 'edge' : 'ok';
+    const txt = left < 0 ? `${nAbs(-left)} מעבר למותר` : left === 0 ? (p.allowed === 0 ? 'אין היעדרויות מותרות' : 'לא נותרו היעדרויות') : left === 1 ? 'נותרה היעדרות אחת' : `נותרו ${left} היעדרויות`;
     return `<div class="meta pallow" id="pallow-${id}"><span>היעדרויות ב${name}${id === cur ? ' (עכשיו)' : ''}: <b>${used}</b> מתוך <b>${p.allowed}</b></span><span class="pill ${cls}">${txt}</span></div>`;
   }).join('');
 }
@@ -1585,12 +1599,14 @@ function applyServer(r) {
   brokenData = !!r.broken;
   if (brokenData) { rev = Number(r.rev) || 0; return; }
   const srv = normState(r.state); const srvRev = Number(r.rev) || 0;
+  const kept = keepLimit(me, srv);                          // srv with our limit, if an old page dropped it
   resolveDoubt(r);
   if (editVer !== savedVer) {
-    const merged = merge3(base, me, srv);
+    const merged = merge3(base, me, kept);
     me = merged; base = srv; rev = srvRev;
     if (sameState(merged, srv)) savedVer = editVer;        // nothing of ours left to send
-  } else { me = srv; base = srv; rev = srvRev; }
+  } else { me = kept; base = srv; rev = srvRev; }
+  if (kept !== srv) setTimeout(() => { if (mode === 'remote' && ready()) writeMe(); }, 0);
   if (editVer === savedVer && (syncState === 'error' || syncState === 'offline' || syncState === 'saving')) syncState = 'saved';
 }
 /* Apply an answer to "load": an answer older than what we have is ignored. A session belongs to one Google account,
@@ -1670,7 +1686,7 @@ function claimTab() {
   /* a tab that closed while we were inactive may have left unsaved marks in the shared copy */
   if (wasInactive) {
     if (mode === 'remote') { const c = readCache(); if (c && c.tab !== TAB_ID && c.nick === (account && account.nick)) takeHandoff({ ...c, mode: 'remote' }); }
-    else if (mode === 'local') { const raw = lsGet(LS_KEY); let st = null; try { st = JSON.parse(raw || 'null'); } catch (e) {} if (st) { me = merge3(localBase, normState(st), me); localBase = me; saveLocal(); } }
+    else if (mode === 'local') { const raw = lsGet(LS_KEY); let st = null; try { st = JSON.parse(raw || 'null'); } catch (e) {} if (st) { me = merge3(localBase, keepLimit(me, normState(st)), me); localBase = me; saveLocal(); } }
   }
 }
 /* the active tab is closing: let a tab that is in front take over */
